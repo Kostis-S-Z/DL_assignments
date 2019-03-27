@@ -3,7 +3,7 @@ Created by Kostis S-Z @ 2019-03-27
 """
 
 import numpy as np
-
+import matplotlib as plt
 
 def load_data(directory):
     """
@@ -47,9 +47,19 @@ def preprocess_data(data, labels):
     :return: the preprocessed data
     """
     data = data / 255
-    labels = np.eye(10)[labels]
+    # labels = np.eye(10)[labels]
 
     return data, labels
+
+
+def plot_loss(self):
+    """
+    Plot the history of the error
+    """
+    x_axis = range(1, len(self.error_history) + 1)
+    y_axis = self.error_history
+    plt.scatter(x_axis, y_axis, alpha=0.7)
+    plt.show()
 
 
 train_x, train_y, val_x, val_y, test_x, test_y = load_data("cifar-10-batches-py")
