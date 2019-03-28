@@ -38,7 +38,7 @@ class OneLayerNetwork:
 
         return w, b
 
-    def train(self, data, labels, n_epochs=100, verbose=False):
+    def train(self, data, labels, val_data, val_labels, n_epochs=100, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """

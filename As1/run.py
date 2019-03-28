@@ -4,8 +4,28 @@ Created by Kostis S-Z @ 2019-03-27
 
 import numpy as np
 import matplotlib as plt
+from network import OneLayerNetwork
 
-def load_data(directory):
+
+directory = "cifar-10-batches-py"
+
+
+def main():
+    train_x, train_y, val_x, val_y, test_x, test_y = load_data()
+
+    train_x, train_y = preprocess_data(train_x, train_y)
+    val_x, val_y = preprocess_data(val_x, val_y)
+    test_x, test_y = preprocess_data(test_x, test_y)
+
+    net = OneLayerNetwork()
+
+    net.train(train_x, train_y, val_x, val_y, n_epochs=500, verbose=True)
+
+    net.test(test_x, test_y)
+
+
+
+def load_data():
     """
     for this assignment we use the data in the following way:
     training data: batch 1
@@ -62,8 +82,5 @@ def plot_loss(self):
     plt.show()
 
 
-train_x, train_y, val_x, val_y, test_x, test_y = load_data("cifar-10-batches-py")
-
-train_x, train_y = preprocess_data(train_x, train_y)
-val_x, val_y = preprocess_data(val_x, val_y)
-test_x, test_y = preprocess_data(test_x, test_y)
+if __name__ == "__main__":
+    main()
