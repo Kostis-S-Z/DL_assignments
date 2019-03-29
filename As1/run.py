@@ -9,6 +9,13 @@ from network import OneLayerNetwork
 
 directory = "cifar-10-batches-py"
 
+model_parameters = {
+    "eta": 0.1,
+    "n_batch": 20,
+    "min_delta": 0.01,
+    "patience": 10
+}
+
 
 def main():
     train_x, train_y, val_x, val_y, test_x, test_y = load_data()
@@ -17,12 +24,11 @@ def main():
     val_x, val_y = preprocess_data(val_x, val_y)
     test_x, test_y = preprocess_data(test_x, test_y)
 
-    net = OneLayerNetwork()
+    net = OneLayerNetwork(**model_parameters)
 
-    net.train(train_x, train_y, val_x, val_y, n_epochs=500, verbose=True)
+    net.train(train_x, train_y, val_x, val_y, n_epochs=2, early_stop=True, verbose=True)
 
     net.test(test_x, test_y)
-
 
 
 def load_data():

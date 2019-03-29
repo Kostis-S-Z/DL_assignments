@@ -16,10 +16,16 @@ class OneLayerNetwork:
         var_defaults = {
             "eta": 0.1,
             "n_batch": 10,
+            "min_delta": 0.01,
+            "patience": 10
         }
 
         for var, default in var_defaults.items():
             setattr(self, var, kwargs.get(var, default))
+
+        self.w = None
+        self.b = None
+        self.p_iter = 0
 
     def init_weights(self, d, k):
         """
@@ -28,35 +34,62 @@ class OneLayerNetwork:
         mean = 0
         std = 0.01
 
+        # Initialize weight matrix
         w = np.random.normal(mean, std, d)
 
         for i in range(k-1):
             w_i = np.random.normal(mean, std, d)
             w = np.vstack((w, w_i))
 
-        b = np.random.normal(mean, std, k)
+        self.w = w
 
-        return w, b
+        # Initialize bias vector
+        self.b = np.random.normal(mean, std, k)
 
-    def train(self, data, labels, val_data, val_labels, n_epochs=100, verbose=False):
+    def train(self, data, labels, val_data, val_labels, n_epochs=100, early_stop=True, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
+        n = data.shape[0]  # number of samples
+        d = data.shape[1]  # number of features
+        k = 10  # number of outputs / classes
+        self.init_weights(d, k)
+
+        batch_epochs = int(n / self.n_batch)
+
         for i in range(n_epochs):
 
-            pred = self.forward(data)
+            np.random.shuffle(data)
 
-            error = self.backward(pred, labels)
+            for batch in range(batch_epochs):
+                start = batch * self.n_batch
+                end = start + self.n_batch
+
+                batch_data = data[start:end]
+                batch_labels = labels[start:end]
+
+                pred = self.forward(batch_data)
+
+                # error = self.backward(pred, batch_labels)
+
+            val_acc = self.test(val_data, val_labels)
+            val_error = 1-val_acc
 
             if verbose:
-                self.print_info(i, error)
+                self.print_info(i, 0, val_error)
+            if early_stop and self.early_stopping(val_error):
+                print("Model reached plateau. Early stopping enabled.")
+                break
+
+
 
     def softmax(self, out):
         """
         Softmax activation function
         :return probabilities of the sample being in each class
         """
-        return
+        e_out = np.exp(out - np.max(out))
+        return e_out / e_out.sum(axis=0)
 
     def forward(self, data):
         """
@@ -64,15 +97,15 @@ class OneLayerNetwork:
         :return: a prediction of the class with the highest probability (int:[0,9])
         """
         # calculate the output of the neurons
-        sum = np.dot(data, self.w)
+        s = np.dot(data, np.transpose(self.w)) + self.b
         # apply softmax activation function
-        p = self.softmax(sum)
+        p = self.softmax(s)
         # predicted class is label with highest probability
-        k = np.argmax(p)
+        k = np.argmax(p, axis=1)
 
         return k
 
-    def backward(self, pred):
+    def backward(self, pred, targets):
         """
         A backward pass in the network to compute the error and update the weights
         :param pred: the predictions of the network
@@ -82,16 +115,16 @@ class OneLayerNetwork:
         error = self.loss(pred)
 
         # update
-        self.w = self.grad_descent()
+        #self.w = self.grad_descent()
 
         return error
 
-    def loss(self):
+    def loss(self, pred):
         """
         Compute the loss function
         :return:
         """
-        return
+        return 0
 
     def grad_descent(self):
         """
@@ -100,6 +133,19 @@ class OneLayerNetwork:
         """
         return
 
+    def early_stopping(self, val_error):
+        """
+        Early stopping implementation. Depending on the validation error stop or not training
+        :return: boolean: true if training should stop
+        """
+        if val_error < self.min_delta:
+            self.p_iter += 1
+            if self.p_iter > self.patience:
+                return True
+        else:
+            self.p_iter = 0
+        return False
+
     def test(self, test_data, test_targets):
         """
         Test a trained model
@@ -107,10 +153,9 @@ class OneLayerNetwork:
 
         pred = self.forward(test_data)
 
-        error = self.misclass_error(pred, test_targets)
+        accuracy = self.accuracy(pred, test_targets)
 
-        print('Test Error: ', error)
-        return error
+        return accuracy
 
     def accuracy(self, predictions, targets):
         """
@@ -119,7 +164,8 @@ class OneLayerNetwork:
         correct = len(np.where(predictions == targets)[0])
         return float(correct/len(targets))
 
-    def print_info(self, iteration, error):
-        print('Iteration: {}'.format(iteration))
-        print(' Train Error: {}'.format(error))
+    def print_info(self, iteration, train_error, val_error):
         print('\n')
+        print('Iteration: {}'.format(iteration))
+        print(' Train Error: {}'.format(train_error))
+        print(' Validation Error: {}'.format(val_error))
