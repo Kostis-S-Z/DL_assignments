@@ -11,6 +11,7 @@ directory = "cifar-10-batches-py"
 
 model_parameters = {
     "eta": 0.01,  # learning rate
+    "momentum": 0.,  # momentum
     "n_batch": 100,  # size of data batches within an epoch
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
