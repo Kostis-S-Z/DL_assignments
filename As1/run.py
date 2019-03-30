@@ -25,6 +25,15 @@ def main():
     val_x, val_y = preprocess_data(val_x, val_y)
     test_x, test_y = preprocess_data(test_x, test_y)
 
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+
+    grid_search(train_x, train_y, val_x, val_y, test_x, test_y)
+
+
+def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
+    """
+    Train and test a single network
+    """
     net = OneLayerNetwork(**model_parameters)
 
     net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=False, verbose=True)
@@ -32,6 +41,49 @@ def main():
     test_error = net.test(test_x, test_y)
 
     print("Test error: ", test_error)
+
+
+def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
+    """
+    Grid search to find the optimal values for the hyper parameters of the network
+    """
+
+    eta_s = [0.01, 0.05, 0.1, 0.15]
+    lambda_reg_s = [0.001, 0.01, 0.05, 0.1]
+    n_batch_s = [10, 50, 100, 500]
+
+    results = {}
+    optimal_parameters = []
+    best_model_error = 1.
+
+    for eta in eta_s:
+        model_parameters["eta"] = eta
+
+        for lambda_reg in lambda_reg_s:
+            model_parameters["lambda_reg"] = lambda_reg
+
+            for n_batch in n_batch_s:
+                model_parameters["n_batch"] = n_batch
+
+                net = OneLayerNetwork(**model_parameters)
+
+                net.train(train_x, train_y, val_x, val_y, n_epochs=1, early_stop=False, verbose=True)
+
+                test_error = net.test(test_x, test_y)
+
+                key = [eta, lambda_reg, n_batch]
+
+                results[str(key)] = test_error
+
+                if test_error < best_model_error:
+                    best_model_error = test_error
+                    optimal_parameters = key
+
+    print("Optimal model parameters:")
+    print("     eta: ", optimal_parameters[0])
+    print("     lambda_reg: ", optimal_parameters[1])
+    print("     n_batch: ", optimal_parameters[2])
+    print("  Test error: ", best_model_error)
 
 
 def load_data():
