@@ -10,10 +10,11 @@ from network import OneLayerNetwork
 directory = "cifar-10-batches-py"
 
 model_parameters = {
-    "eta": 0.1,
-    "n_batch": 20,
-    "min_delta": 0.01,
-    "patience": 10
+    "eta": 0.1,  # learning rate
+    "n_batch": 10,  # size of data batches within an epoch
+    "lambda_reg": 0.,  # regularizing term variable
+    "min_delta": 0.01,  # minimum accepted validation error
+    "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
 
@@ -73,7 +74,7 @@ def preprocess_data(data, labels):
     :return: the preprocessed data
     """
     data = data / 255
-    # labels = np.eye(10)[labels]
+    labels = np.eye(10)[labels]
 
     return data, labels
 
