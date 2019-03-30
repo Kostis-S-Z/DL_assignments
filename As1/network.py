@@ -62,6 +62,7 @@ class OneLayerNetwork:
 
             # Shuffle the data row-wise (across samples)
             np.random.shuffle(data)  # current form of data: samples x features
+            av_acc = 0
 
             for batch in range(batch_epochs):
                 start = batch * self.n_batch
@@ -79,27 +80,42 @@ class OneLayerNetwork:
                 # Run a backward pass in the network, computing the loss and updating the weights
                 loss = self.backward(batch_data, prob_out, batch_labels)
 
-            val_acc = self.test(val_data, val_labels)
-            val_error = 1-val_acc
+                class_targets = np.argmax(batch_labels, axis=0)
+                av_acc += self.accuracy(class_out, class_targets)
 
-            if verbose:
-                self.print_info(i, 0, val_error)
-            if early_stop and self.early_stopping(val_error):
-                print("Model reached plateau. Early stopping enabled.")
-                break
+            print("Accuracy: {}".format(av_acc / batch_epochs))
+
+            if early_stop:
+                val_acc = self.test(val_data, val_labels)
+                val_error = 1 - val_acc
+                if self.early_stopping(val_error):
+                    print("Model reached plateau. Early stopping enabled.")
+                    break
 
     def test(self, test_data, test_targets):
         """
         Test a trained model
         """
 
-        prob_out, class_out = self.forward(test_data)
+        n = test_data.shape[0]  # number of samples
+        batch_epochs = int(n / self.n_batch)
 
-        class_targets = np.argmax(test_targets, axis=0)
+        test_average_acc = 0
 
-        accuracy = self.accuracy(class_out, class_targets)
+        for batch in range(batch_epochs):
+            start = batch * self.n_batch
+            end = start + self.n_batch
 
-        return accuracy
+            batch_data = test_data[start:end].T
+            batch_labels = test_targets[start:end].T
+
+            prob_out, class_out = self.forward(batch_data)
+
+            class_targets = np.argmax(batch_labels, axis=0)
+
+            test_average_acc += self.accuracy(class_out, class_targets)
+
+        return test_average_acc / batch_epochs
 
     def forward(self, data):
         """
@@ -130,15 +146,26 @@ class OneLayerNetwork:
         # Compute loss function and L2 Regularization term (lambda * ||W||^2)
         loss = self.loss(p_out, targets) + self.reg()
 
-        # Compute gradient of the weights
-        w_grad = self.grad_descent(self.w, )
+        # Compute the gradient of the loss
+        loss_grad = - (targets - p_out)
+        # Compute the gradient w.r.t the weights
+        #   -> inner product (sum) of the loss*data_inputs
+        w_grad = np.dot(loss_grad, data.T)
+
+        # Compute the gradient w.r.t the bias
+        #   -> inner product (sum) of the loss*bias_inputs where bias_inputs is a vector of 1s, each for every sample
+        #   -> its basically the same as doing np.sum(loss_grad, axis=1)
+        b_grad = np.sum(loss_grad, axis=0)  # np.dot(loss_grad, np.ones((self.n_batch, 1)))
+
+        # Divide with the size of the batch
+        w_grad = w_grad / self.n_batch
+        b_grad = b_grad / self.n_batch
+
         # Compute gradient of regularization term w.r.t the weights
         reg_grad = 2 * self.lambda_reg * self.w
-        # Compute gradient of the bias
-        b_grad = self.grad_descent(self.b, )
 
         # Update weights and bias
-        self.w = self.w - self.eta * w_grad
+        self.w = self.w - self.eta * (w_grad + reg_grad)
         self.b = self.b - self.eta * b_grad
 
         return loss
@@ -147,21 +174,14 @@ class OneLayerNetwork:
         """
         Compute the cross-entropy loss of a forward pass between the predictions of the network and the real targets
         """
-        return - np.log(np.dot(targets.T, p_out))
+        loss_batch = - np.log(np.dot(targets.T, p_out))
+        return loss_batch.sum(axis=0) / self.n_batch
 
     def reg(self):
         """
         Compute the regularization term, in this case L2: lambda * ||W||^2
         """
         return self.lambda_reg * np.sum(np.square(self.w))
-
-    def grad_descent(self):
-        """
-        Compute the gradients w.r.t to the given samples and the regularizing term
-        :return:
-        """
-
-        return
 
     def early_stopping(self, val_error):
         """

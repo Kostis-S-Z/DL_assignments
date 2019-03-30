@@ -10,8 +10,8 @@ from network import OneLayerNetwork
 directory = "cifar-10-batches-py"
 
 model_parameters = {
-    "eta": 0.1,  # learning rate
-    "n_batch": 10,  # size of data batches within an epoch
+    "eta": 0.01,  # learning rate
+    "n_batch": 100,  # size of data batches within an epoch
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
     "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
@@ -27,9 +27,11 @@ def main():
 
     net = OneLayerNetwork(**model_parameters)
 
-    net.train(train_x, train_y, val_x, val_y, n_epochs=2, early_stop=True, verbose=True)
+    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=False, verbose=True)
 
-    net.test(test_x, test_y)
+    test_error = net.test(test_x, test_y)
+
+    print("Test error: ", test_error)
 
 
 def load_data():
