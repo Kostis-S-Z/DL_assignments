@@ -11,11 +11,10 @@ directory = "cifar-10-batches-py"
 
 model_parameters = {
     "eta": 0.01,  # learning rate
-    "momentum": 0.,  # momentum
     "n_batch": 100,  # size of data batches within an epoch
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
-    "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
+    "patience": 5  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
 
@@ -26,9 +25,9 @@ def main():
     val_x, val_y = preprocess_data(val_x, val_y)
     test_x, test_y = preprocess_data(test_x, test_y)
 
-    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
-    grid_search(train_x, train_y, val_x, val_y, test_x, test_y)
+    # grid_search(train_x, train_y, val_x, val_y, test_x, test_y)
 
 
 def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
@@ -37,7 +36,7 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     net = OneLayerNetwork(**model_parameters)
 
-    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=False, verbose=True)
+    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=True, verbose=True)
 
     test_error = net.test(test_x, test_y)
 

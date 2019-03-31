@@ -27,6 +27,7 @@ class OneLayerNetwork:
         self.w = None
         self.b = None
         self.p_iter = 0
+        self.prev_val_error = 0
 
     def init_weights(self, d, k):
         """
@@ -54,23 +55,28 @@ class OneLayerNetwork:
         n = data.shape[0]  # number of samples
         d = data.shape[1]  # number of features
         k = 10  # number of outputs / classes
+        indices = np.arange(n)  # a list of the indices of the data to shuffle
         self.init_weights(d, k)
 
         batch_epochs = int(n / self.n_batch)
 
         for i in range(n_epochs):
 
-            # Shuffle the data row-wise (across samples)
-            np.random.shuffle(data)  # current form of data: samples x features
-            av_acc = 0
+            # Shuffle the data and the labels across samples
+            np.random.shuffle(indices)  # shuffle the indices and then the data and labels based on this
+            data = data[indices]  # current form of data: samples x features
+            labels = labels[indices]
+
+            av_acc = 0  # Average epoch accuracy
 
             for batch in range(batch_epochs):
                 start = batch * self.n_batch
                 end = start + self.n_batch
 
                 # Number of rows: Features, Number of columns: Samples
-                batch_data = data[start:end].T  # Convert so that features x batch_size
-                batch_labels = labels[start:end].T  # Convert so that classes x batch_size
+                batch_data = data[start:end].T  # Transpose so that features x batch_size
+                batch_labels = labels[start:end].T  # Transpose so that classes x batch_size
+                batch_classes = np.argmax(batch_labels, axis=0)  # Convert from one-hot to integer form
 
                 # Run a forward pass in the network
                 # p_output: the result of the softmax function, the real output of the network
@@ -80,8 +86,7 @@ class OneLayerNetwork:
                 # Run a backward pass in the network, computing the loss and updating the weights
                 loss = self.backward(batch_data, prob_out, batch_labels)
 
-                class_targets = np.argmax(batch_labels, axis=0)
-                av_acc += self.accuracy(class_out, class_targets)
+                av_acc += self.accuracy(class_out, batch_classes)
 
             print("Accuracy: {}".format(av_acc / batch_epochs))
 
@@ -108,12 +113,11 @@ class OneLayerNetwork:
 
             batch_data = test_data[start:end].T
             batch_labels = test_targets[start:end].T
+            batch_classes = np.argmax(batch_labels, axis=0)
 
             prob_out, class_out = self.forward(batch_data)
 
-            class_targets = np.argmax(batch_labels, axis=0)
-
-            test_average_acc += self.accuracy(class_out, class_targets)
+            test_average_acc += self.accuracy(class_out, batch_classes)
 
         return test_average_acc / batch_epochs
 
@@ -148,6 +152,7 @@ class OneLayerNetwork:
 
         # Compute the gradient of the loss
         loss_grad = - (targets - p_out)
+
         # Compute the gradient w.r.t the weights
         #   -> inner product (sum) of the loss*data_inputs
         w_grad = np.dot(loss_grad, data.T)
@@ -185,15 +190,17 @@ class OneLayerNetwork:
 
     def early_stopping(self, val_error):
         """
-        Early stopping implementation. Depending on the validation error stop or not training
+        Early stopping implementation.
         :return: boolean: true if training should stop
         """
-        if val_error < self.min_delta:
+        diff = np.abs(val_error - self.prev_val_error)  # Check if there is a big difference between the validation error
+        if diff < self.min_delta:
             self.p_iter += 1
             if self.p_iter > self.patience:
                 return True
         else:
             self.p_iter = 0
+        self.prev_val_error = val_error  # Update the previous error to the current one
         return False
 
     def accuracy(self, predictions, targets):
