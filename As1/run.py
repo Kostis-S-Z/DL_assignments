@@ -3,16 +3,15 @@ Created by Kostis S-Z @ 2019-03-27
 """
 
 import numpy as np
-import matplotlib as plt
 from network import OneLayerNetwork
 
 
 directory = "cifar-10-batches-py"
 
 model_parameters = {
-    "eta": 0.01,  # learning rate
+    "eta": 0.001,  # learning rate
     "n_batch": 100,  # size of data batches within an epoch
-    "lambda_reg": 0.,  # regularizing term variable
+    "lambda_reg": 0.01,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
     "patience": 5  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
@@ -38,9 +37,11 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
 
     net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=True, verbose=True)
 
-    test_error = net.test(test_x, test_y)
+    net.plot_loss()
 
-    print("Test error: ", test_error)
+    test_accuracy = net.test(test_x, test_y)
+
+    print("Test accuracy: ", test_accuracy)
 
 
 def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
@@ -54,7 +55,7 @@ def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
 
     results = {}
     optimal_parameters = []
-    best_model_error = 1.
+    best_model_accuracy = 1.
 
     for eta in eta_s:
         model_parameters["eta"] = eta
@@ -64,26 +65,29 @@ def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
 
             for n_batch in n_batch_s:
                 model_parameters["n_batch"] = n_batch
+                print("Initializing Network with:")
+                print("     eta: {} lambda: {} batch_size: {}".format(eta, lambda_reg, n_batch))
 
                 net = OneLayerNetwork(**model_parameters)
 
-                net.train(train_x, train_y, val_x, val_y, n_epochs=1, early_stop=False, verbose=True)
+                net.train(train_x, train_y, val_x, val_y, n_epochs=10, early_stop=False, verbose=False)
 
-                test_error = net.test(test_x, test_y)
+                test_accuracy = net.test(test_x, test_y)
+                print("     Test accuracy: ", test_accuracy)
 
                 key = [eta, lambda_reg, n_batch]
 
-                results[str(key)] = test_error
+                results[str(key)] = test_accuracy
 
-                if test_error < best_model_error:
-                    best_model_error = test_error
+                if test_accuracy > best_model_accuracy:
+                    best_model_accuracy = test_accuracy
                     optimal_parameters = key
 
     print("Optimal model parameters:")
     print("     eta: ", optimal_parameters[0])
     print("     lambda_reg: ", optimal_parameters[1])
     print("     n_batch: ", optimal_parameters[2])
-    print("  Test error: ", best_model_error)
+    print("  Test accuracy: ", best_model_accuracy)
 
 
 def load_data():
@@ -131,16 +135,6 @@ def preprocess_data(data, labels):
     labels = np.eye(10)[labels]
 
     return data, labels
-
-
-def plot_loss(self):
-    """
-    Plot the history of the error
-    """
-    x_axis = range(1, len(self.error_history) + 1)
-    y_axis = self.error_history
-    plt.scatter(x_axis, y_axis, alpha=0.7)
-    plt.show()
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ Created by Kostis S-Z @ 2019-03-27
 
 
 import numpy as np
+from matplotlib import pyplot as plt
 
 
 class OneLayerNetwork:
@@ -28,6 +29,7 @@ class OneLayerNetwork:
         self.b = None
         self.p_iter = 0
         self.prev_val_error = 0
+        self.loss_history = []
 
     def init_weights(self, d, k):
         """
@@ -60,6 +62,8 @@ class OneLayerNetwork:
 
         batch_epochs = int(n / self.n_batch)
 
+        self.loss_history = []
+
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
@@ -88,7 +92,10 @@ class OneLayerNetwork:
 
                 av_acc += self.accuracy(class_out, batch_classes)
 
-            print("Accuracy: {}".format(av_acc / batch_epochs))
+            self.loss_history.append(loss)  # TODO: change av_acc to epoch loss
+
+            if verbose:
+                print("Epoch: {} - Accuracy: {} Loss: {}".format(i, av_acc / batch_epochs, loss))
 
             if early_stop:
                 val_acc = self.test(val_data, val_labels)
@@ -180,7 +187,7 @@ class OneLayerNetwork:
         Compute the cross-entropy loss of a forward pass between the predictions of the network and the real targets
         """
         loss_batch = - np.log(np.dot(targets.T, p_out))
-        return loss_batch.sum(axis=0) / self.n_batch
+        return np.sum(loss_batch.sum(axis=0)) / (self.n_batch * self.n_batch)
 
     def reg(self):
         """
@@ -215,3 +222,14 @@ class OneLayerNetwork:
         print('Iteration: {}'.format(iteration))
         print(' Train Error: {}'.format(train_error))
         print(' Validation Error: {}'.format(val_error))
+
+    def plot_loss(self):
+        """
+        Plot the history of the error
+        """
+        x_axis = range(1, len(self.loss_history) + 1)
+        y_axis = self.loss_history
+        plt.scatter(x_axis, y_axis, alpha=0.7)
+        plt.xlabel('epochs')
+        plt.ylabel('training loss')
+        plt.show()
