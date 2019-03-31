@@ -233,3 +233,20 @@ class OneLayerNetwork:
         plt.xlabel('epochs')
         plt.ylabel('training loss')
         plt.show()
+
+    def plot_weight_matrix(self, node, object_name):
+        """
+        Plot the learnt representation (weight matrix) of a node
+        """
+
+        weights = self.w[node].reshape(32, 32, 3)  # Convert vector of features to image form
+
+        image = (weights - weights.min()) / (weights.max() - weights.min())
+
+        # image = np.transpose(image, (1, 0, 2))  # TODO: maybe a permute function for [2, 1, 3] ???
+
+        plt.imshow(image)
+        plt.title("Representation of node {} - {}".format(node, object_name))
+        plt.xticks([])
+        plt.yticks([])
+        plt.show()

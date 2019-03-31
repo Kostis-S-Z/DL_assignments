@@ -8,6 +8,19 @@ from network import OneLayerNetwork
 
 directory = "cifar-10-batches-py"
 
+labels_to_names = {
+    0: "airplane",
+    1: "automobile",
+    2: "bird",
+    3: "cat",
+    4: "deer",
+    5: "dog",
+    6: "frog",
+    7: "horse",
+    8: "ship",
+    9: "truck"
+}
+
 model_parameters = {
     "eta": 0.001,  # learning rate
     "n_batch": 100,  # size of data batches within an epoch
@@ -35,9 +48,13 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     net = OneLayerNetwork(**model_parameters)
 
-    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=True, verbose=True)
+    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=False, verbose=True)
 
-    net.plot_loss()
+    net.plot_loss()  # Plot the loss progress
+
+    # Plot the learnt representations of the weight matrices
+    for i, name in labels_to_names.items():
+        net.plot_weight_matrix(i, name)
 
     test_accuracy = net.test(test_x, test_y)
 
