@@ -18,8 +18,13 @@ class OneLayerNetwork:
             "eta": 0.1,  # learning rate
             "n_batch": 10,  # size of data batches within an epoch
             "lambda_reg": 0.,  # regularizing term variable
+            "loss_type": "cross-entropy",  # cross-entropy or SVM multi-class
             "min_delta": 0.01,  # minimum accepted validation error
             "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
+        }
+        self.loss_function = {
+            "cross-entropy": self.cross_entropy,
+            "SVM multi-class": self.svm_multi
         }
 
         for var, default in var_defaults.items():
@@ -154,11 +159,11 @@ class OneLayerNetwork:
         """
         A backward pass in the network to update the weights with gradient descent
         """
-        # Compute loss function and L2 Regularization term (lambda * ||W||^2)
-        loss = self.loss(p_out, targets) + self.reg()
+        # Compute the loss and its gradient
+        loss, loss_grad = self.loss(p_out, targets)
 
-        # Compute the gradient of the loss
-        loss_grad = - (targets - p_out)
+        # Add the L2 Regularization term (lambda * ||W||^2) to the loss
+        loss = loss + self.reg()
 
         # Compute the gradient w.r.t the weights
         #   -> inner product (sum) of the loss*data_inputs
@@ -184,10 +189,34 @@ class OneLayerNetwork:
 
     def loss(self, p_out, targets):
         """
-        Compute the cross-entropy loss of a forward pass between the predictions of the network and the real targets
+        Compute the cross-entropy OR the svm multi-class loss
+        of a forward pass between the predictions of the network and the real targets
+        """
+
+        function = self.loss_function[self.loss_type]
+        return function(p_out, targets)
+
+    def cross_entropy(self, p_out, targets):
+        """
+        Calculate the cross-entropy loss function and its gradient
         """
         loss_batch = - np.log(np.dot(targets.T, p_out))
-        return np.sum(loss_batch.sum(axis=0)) / (self.n_batch * self.n_batch)
+        loss_value = np.sum(loss_batch.sum(axis=0)) / (self.n_batch * self.n_batch)
+
+        # Compute the gradient of the loss
+        loss_grad = - (targets - p_out)
+
+        return loss_value, loss_grad
+
+    def svm_multi(self, p_out, targets):
+        """
+        Calculate the SVM multi-class loss function and its gradient
+        """
+        # TODO: implement svm multi-class loss
+        loss_value = 0
+
+        loss_grad = 0
+        return loss_value, loss_grad
 
     def reg(self):
         """
