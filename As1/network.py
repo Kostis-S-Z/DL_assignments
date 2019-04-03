@@ -200,8 +200,9 @@ class OneLayerNetwork:
         """
         Calculate the cross-entropy loss function and its gradient
         """
-        loss_batch = - np.log(np.dot(targets.T, p_out))
-        loss_value = np.sum(loss_batch.sum(axis=0)) / (self.n_batch * self.n_batch)
+        l = np.sum(targets * p_out, axis=0)
+        loss_batch = - np.log(l)
+        loss_value = np.sum(loss_batch, axis=0) / self.n_batch
 
         # Compute the gradient of the loss
         loss_grad = - (targets - p_out)
@@ -212,7 +213,6 @@ class OneLayerNetwork:
         """
         Calculate the SVM multi-class loss function and its gradient
         """
-        # TODO: implement svm multi-class loss
         loss_value = 0
 
         loss_grad = 0
@@ -258,7 +258,7 @@ class OneLayerNetwork:
         """
         x_axis = range(1, len(self.loss_history) + 1)
         y_axis = self.loss_history
-        plt.scatter(x_axis, y_axis, alpha=0.7)
+        plt.plot(x_axis, y_axis, alpha=0.7)
         plt.xlabel('epochs')
         plt.ylabel('training loss')
         plt.show()
@@ -268,11 +268,11 @@ class OneLayerNetwork:
         Plot the learnt representation (weight matrix) of a node
         """
 
-        weights = self.w[node].reshape(32, 32, 3)  # Convert vector of features to image form
+        weights = self.w[node].reshape((32, 32, 3), order='F')  # Convert vector of features to image form
 
         image = (weights - weights.min()) / (weights.max() - weights.min())
 
-        # image = np.transpose(image, (1, 0, 2))  # TODO: maybe a permute function for [2, 1, 3] ???
+        image = np.rot90(image, 3)
 
         plt.imshow(image)
         plt.title("Representation of node {} - {}".format(node, object_name))

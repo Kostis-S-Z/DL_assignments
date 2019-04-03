@@ -22,10 +22,10 @@ labels_to_names = {
 }
 
 model_parameters = {
-    "eta": 0.001,  # learning rate
+    "eta": 0.01,  # learning rate
     "n_batch": 100,  # size of data batches within an epoch
     "loss_type": "cross-entropy",  # cross-entropy or SVM multi-class
-    "lambda_reg": 0.01,  # regularizing term variable
+    "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
     "patience": 5  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
