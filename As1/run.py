@@ -4,9 +4,11 @@ Created by Kostis S-Z @ 2019-03-27
 
 import numpy as np
 from network import OneLayerNetwork
+from pathlib import Path
 
 
-directory = "cifar-10-batches-py"
+parent_dir = str(Path.cwd().parent)  # Get the parent directory of the current working directory
+directory = parent_dir + "/cifar-10-batches-py"  # The dataset should be in the parent directory
 
 labels_to_names = {
     0: "airplane",
@@ -24,7 +26,7 @@ labels_to_names = {
 model_parameters = {
     "eta": 0.01,  # learning rate
     "n_batch": 100,  # size of data batches within an epoch
-    "loss_type": "cross-entropy",  # cross-entropy or SVM multi-class
+    "loss_type": "cross-entropy",  # cross-entropy or svm
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
     "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
@@ -67,13 +69,13 @@ def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
     Grid search to find the optimal values for the hyper parameters of the network
     """
 
-    eta_s = [0.01, 0.05, 0.1, 0.15]
-    lambda_reg_s = [0.001, 0.01, 0.05, 0.1]
-    n_batch_s = [10, 50, 100, 500]
+    eta_s = [0.005, 0.01, 0.05, 0.1]
+    lambda_reg_s = [0.001, 0.01, 0.05, 0.1, 0.5]
+    n_batch_s = [50, 100, 500]
 
     results = {}
     optimal_parameters = []
-    best_model_accuracy = 1.
+    best_model_accuracy = 0.
 
     for eta in eta_s:
         model_parameters["eta"] = eta
@@ -88,9 +90,9 @@ def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
 
                 net = OneLayerNetwork(**model_parameters)
 
-                net.train(train_x, train_y, val_x, val_y, n_epochs=10, early_stop=False, verbose=False)
+                net.train(train_x, train_y, val_x, val_y, n_epochs=10, early_stop=True, verbose=False)
 
-                test_accuracy = net.test(test_x, test_y)
+                test_loss, test_accuracy = net.test(test_x, test_y)
                 print("     Test accuracy: ", test_accuracy)
 
                 key = [eta, lambda_reg, n_batch]

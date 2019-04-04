@@ -24,7 +24,7 @@ class OneLayerNetwork:
         }
         self.loss_function = {
             "cross-entropy": self.cross_entropy,
-            "SVM multi-class": self.svm_multi
+            "svm": self.svm_multi
         }
 
         for var, default in var_defaults.items():
@@ -114,7 +114,6 @@ class OneLayerNetwork:
 
                 val_error = 1 - val_acc
                 if self.early_stopping(val_error):
-                    print("Model reached plateau. Early stopping enabled.")
                     break
 
     def test(self, test_data, test_targets):
@@ -241,10 +240,11 @@ class OneLayerNetwork:
         Early stopping implementation.
         :return: boolean: true if training should stop
         """
-        diff = np.abs(val_error - self.prev_val_error)  # Check if there is a big difference between the validation error
+        diff = np.abs(val_error - self.prev_val_error)  # If there is a big difference between the validation error
         if diff < self.min_delta:
             self.p_iter += 1
             if self.p_iter > self.patience:
+                print("Model reached plateau. Early stopping enabled.")
                 return True
         else:
             self.p_iter = 0
