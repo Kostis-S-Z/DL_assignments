@@ -27,7 +27,7 @@ model_parameters = {
     "loss_type": "cross-entropy",  # cross-entropy or SVM multi-class
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
-    "patience": 5  # how many epochs to wait before stopping training if the val_error is below min_delta
+    "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
 

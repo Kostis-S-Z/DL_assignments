@@ -34,7 +34,8 @@ class OneLayerNetwork:
         self.b = None
         self.p_iter = 0
         self.prev_val_error = 0
-        self.loss_history = []
+        self.loss_train_av_history = []
+        self.loss_val_av_history = []
 
     def init_weights(self, d, k):
         """
@@ -67,7 +68,7 @@ class OneLayerNetwork:
 
         batch_epochs = int(n / self.n_batch)
 
-        self.loss_history = []
+        self.loss_train_av_history = []
 
         for i in range(n_epochs):
 
@@ -77,6 +78,7 @@ class OneLayerNetwork:
             labels = labels[indices]
 
             av_acc = 0  # Average epoch accuracy
+            av_loss = 0  # Average epoch loss
 
             for batch in range(batch_epochs):
                 start = batch * self.n_batch
@@ -94,16 +96,22 @@ class OneLayerNetwork:
 
                 # Run a backward pass in the network, computing the loss and updating the weights
                 loss = self.backward(batch_data, prob_out, batch_labels)
+                av_loss += loss
 
                 av_acc += self.accuracy(class_out, batch_classes)
 
-            self.loss_history.append(loss)  # TODO: change av_acc to epoch loss
+            average_epoch_loss = av_loss / batch_epochs
+            average_epoch_acc = av_acc / batch_epochs
+            self.loss_train_av_history.append(average_epoch_loss)
 
             if verbose:
-                print("Epoch: {} - Accuracy: {} Loss: {}".format(i, av_acc / batch_epochs, loss))
+                print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
 
             if early_stop:
-                val_acc = self.test(val_data, val_labels)
+                val_loss, val_acc = self.test(val_data, val_labels)
+
+                self.loss_val_av_history.append(val_loss)
+
                 val_error = 1 - val_acc
                 if self.early_stopping(val_error):
                     print("Model reached plateau. Early stopping enabled.")
@@ -118,6 +126,7 @@ class OneLayerNetwork:
         batch_epochs = int(n / self.n_batch)
 
         test_average_acc = 0
+        test_average_loss = 0
 
         for batch in range(batch_epochs):
             start = batch * self.n_batch
@@ -129,9 +138,12 @@ class OneLayerNetwork:
 
             prob_out, class_out = self.forward(batch_data)
 
+            loss, _ = self.loss(prob_out, batch_labels)
+            test_average_loss += loss
+
             test_average_acc += self.accuracy(class_out, batch_classes)
 
-        return test_average_acc / batch_epochs
+        return test_average_loss / batch_epochs, test_average_acc / batch_epochs
 
     def forward(self, data):
         """
@@ -256,11 +268,14 @@ class OneLayerNetwork:
         """
         Plot the history of the error
         """
-        x_axis = range(1, len(self.loss_history) + 1)
-        y_axis = self.loss_history
-        plt.plot(x_axis, y_axis, alpha=0.7)
+        x_axis = range(1, len(self.loss_train_av_history) + 1)
+        y_axis_train = self.loss_train_av_history
+        y_axis_val = self.loss_val_av_history
+        plt.plot(x_axis, y_axis_train, alpha=0.7, label="Train loss")
+        plt.plot(x_axis, y_axis_val, alpha=0.7, label="Validation loss")
+        plt.legend(loc='upper right')
         plt.xlabel('epochs')
-        plt.ylabel('training loss')
+        plt.ylabel('loss')
         plt.show()
 
     def plot_weight_matrix(self, node, object_name):
