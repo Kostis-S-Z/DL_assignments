@@ -19,6 +19,7 @@ class OneLayerNetwork:
             "n_batch": 10,  # size of data batches within an epoch
             "lambda_reg": 0.,  # regularizing term variable
             "loss_type": "cross-entropy",  # cross-entropy or SVM multi-class
+            "svm_margin": 1,  # margin parameter for svm loss
             "min_delta": 0.01,  # minimum accepted validation error
             "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
         }
@@ -120,7 +121,6 @@ class OneLayerNetwork:
         """
         Test a trained model
         """
-
         n = test_data.shape[0]  # number of samples
         batch_epochs = int(n / self.n_batch)
 
@@ -211,8 +211,11 @@ class OneLayerNetwork:
         """
         Calculate the cross-entropy loss function and its gradient
         """
+        # Take the sum over classes
         l = np.sum(targets * p_out, axis=0)
+        # Compute the log
         loss_batch = - np.log(l)
+        # Take the mean over samples
         loss_value = np.sum(loss_batch, axis=0) / self.n_batch
 
         # Compute the gradient of the loss
@@ -224,7 +227,39 @@ class OneLayerNetwork:
         """
         Calculate the SVM multi-class loss function and its gradient
         """
-        loss_value = 0
+        # Convert the one-hot back to integer representation
+        targets_class = np.argmax(targets, axis=0)
+        # Get list of indices for the batch samples
+        indices = np.arange(self.n_batch)
+        # Transpose the output matrix to get the correct dimensions
+        p_out_t = p_out.T
+        # For every batch get its score (probability) for the actual (target) class it belongs to
+        correct_p = p_out_t[indices, targets_class]
+        # For every sample prediction in the batch
+        # subtract from each class the number of prediction of the correct class, phew that's a mouthful...
+        sub_p = p_out - correct_p
+        # Add a margin parameter
+        sub_p = sub_p + self.svm_margin
+        # Replace negative values with zero
+        margins = np.maximum(0, sub_p)
+        # Transpose the margins matrix to get the correct dimensions
+        margins = margins.T
+        # Replace the correct class predictions with zero
+        margins[indices, targets_class] = 0
+        # Sum over classes
+        sum = np.sum(margins, axis=1)
+        # Take the mean loss over the batch samples
+        loss_value = np.mean(sum)
+
+        # Compute the gradient SVM loss
+        margins_b = margins
+        # Convert to binary values: 1 -> weights need to updated (wrong predictions) 0 -> weights not to update
+        margins_b[margins > 0] = 1
+        # Sum over samples (?)
+
+        # Subtract
+
+        #
 
         loss_grad = 0
         return loss_value, loss_grad
