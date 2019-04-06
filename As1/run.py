@@ -24,13 +24,13 @@ labels_to_names = {
 }
 
 model_parameters = {
-    "eta": 0.01,  # learning rate
+    "eta": 0.001,  # learning rate
     "n_batch": 100,  # size of data batches within an epoch
     "loss_type": "svm",  # cross-entropy or svm
-    "svm_margin": 1,  # margin parameter for svm loss
-    "lambda_reg": 0.,  # regularizing term variable
+    "svm_margin": 1.,  # margin parameter for svm loss
+    "lambda_reg": .1,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
-    "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
+    "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
 
@@ -71,13 +71,14 @@ def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
     """
 
     eta_s = [0.005, 0.01, 0.05, 0.1]
-    lambda_reg_s = [0.001, 0.01, 0.05, 0.1, 0.5]
-    n_batch_s = [50, 100, 500]
+    lambda_reg_s = [0.001, 0.01, 0.05, 0.1]
+    n_batch_s = [10, 50, 100, 500]
 
     results = {}
     optimal_parameters = []
     best_model_accuracy = 0.
 
+    print("Model parameters | Test accuracy")
     for eta in eta_s:
         model_parameters["eta"] = eta
 
@@ -87,14 +88,16 @@ def grid_search(train_x, train_y, val_x, val_y, test_x, test_y):
             for n_batch in n_batch_s:
                 model_parameters["n_batch"] = n_batch
                 print("Initializing Network with:")
-                print("     eta: {} lambda: {} batch_size: {}".format(eta, lambda_reg, n_batch))
+                print("       eta: {} lambda: {} batch_size: {}".format(eta, lambda_reg, n_batch))
 
                 net = OneLayerNetwork(**model_parameters)
 
-                net.train(train_x, train_y, val_x, val_y, n_epochs=10, early_stop=True, verbose=False)
+                net.train(train_x, train_y, val_x, val_y, n_epochs=50, early_stop=False, verbose=False)
 
                 test_loss, test_accuracy = net.test(test_x, test_y)
-                print("     Test accuracy: ", test_accuracy)
+                test_acc = round(test_accuracy * 100, 1)
+                # print("eta: {} lambda: {} batch_size: {}  | test accuracy: {}%".format(eta, lambda_reg, n_batch, test_acc))
+                print("     Test accuracy: ", test_acc)
 
                 key = [eta, lambda_reg, n_batch]
 

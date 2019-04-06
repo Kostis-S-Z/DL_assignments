@@ -1,0 +1,19 @@
+model1_parameters = {
+    "eta": 0.1,
+    "lambda_reg": 0.,
+}
+
+model2_parameters = {
+    "eta": 0.01,
+    "lambda_reg": 0.,
+}
+
+model3_parameters = {
+    "eta": 0.01,
+    "lambda_reg": 0.1,
+}
+
+model4_parameters = {
+    "eta": 0.01,
+    "lambda_reg": 1.,
+}
