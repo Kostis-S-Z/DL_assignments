@@ -26,7 +26,7 @@ labels_to_names = {
 model_parameters = {
     "eta": 0.01,  # learning rate
     "n_batch": 100,  # size of data batches within an epoch
-    "loss_type": "cross-entropy",  # cross-entropy or svm
+    "loss_type": "svm",  # cross-entropy or svm
     "svm_margin": 1,  # margin parameter for svm loss
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error

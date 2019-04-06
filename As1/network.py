@@ -93,8 +93,10 @@ class OneLayerNetwork:
                 # Run a forward pass in the network
                 # p_output: the result of the softmax function, the real output of the network
                 # class_output: by choosing the node with the highest probability we get the predicted class
-                prob_out, class_out = self.forward(batch_data)
-
+                real_out, prob_out, class_out = self.forward(batch_data)
+                # In the case of the SVM loss you update the weights with the unfiltered output
+                if self.loss_type == "svm":
+                    prob_out = real_out
                 # Run a backward pass in the network, computing the loss and updating the weights
                 loss = self.backward(batch_data, prob_out, batch_labels)
                 av_loss += loss
@@ -135,8 +137,10 @@ class OneLayerNetwork:
             batch_labels = test_targets[start:end].T
             batch_classes = np.argmax(batch_labels, axis=0)
 
-            prob_out, class_out = self.forward(batch_data)
-
+            real_out, prob_out, class_out = self.forward(batch_data)
+            # In the case of the SVM loss you update the weights with the unfiltered output
+            if self.loss_type == "svm":
+                prob_out = real_out
             loss, _ = self.loss(prob_out, batch_labels)
             test_average_loss += loss
 
@@ -147,7 +151,9 @@ class OneLayerNetwork:
     def forward(self, data):
         """
         A forward pass in the network computing the predicted class
-        :return: a prediction of the class with the highest probability (int:[0,9])
+        :return: the output before the activation function
+        the output after the activation function and
+        a prediction of the class with the highest probability (int:[0,9])
         """
         # calculate the output of the neurons
         s = np.dot(self.w, data) + self.b
@@ -156,7 +162,7 @@ class OneLayerNetwork:
         # predicted class is label with highest probability
         k = np.argmax(p, axis=0)
 
-        return p, k
+        return s, p, k
 
     def softmax(self, out):
         """
@@ -203,7 +209,6 @@ class OneLayerNetwork:
         Compute the cross-entropy OR the svm multi-class loss
         of a forward pass between the predictions of the network and the real targets
         """
-
         function = self.loss_function[self.loss_type]
         return function(p_out, targets)
 
@@ -218,7 +223,6 @@ class OneLayerNetwork:
 
         # Compute the gradient of the loss
         loss_grad = - (targets - p_out)
-
         return loss_value, loss_grad
 
     def svm_multi(self, p_out, targets):
@@ -253,13 +257,14 @@ class OneLayerNetwork:
         margins_b = margins
         # Convert to binary values: 1 -> weights need to updated (wrong predictions) 0 -> weights not to update
         margins_b[margins > 0] = 1
-        # Sum over samples (?)
-
-        # Subtract
-
-        #
-
-        loss_grad = 0
+        # Sum over the samples for every class
+        wrongs_per_class = np.sum(margins_b, axis=1)
+        # Convert the matrix and the vector to correct forms
+        margins_b = margins_b
+        # At each class subtract the number of the wrongly predicted samples
+        margins_b[indices, targets_class] = - wrongs_per_class
+        # Transpose it back
+        loss_grad = margins_b.T
         return loss_value, loss_grad
 
     def reg(self):
