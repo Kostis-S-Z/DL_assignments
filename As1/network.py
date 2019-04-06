@@ -211,12 +211,10 @@ class OneLayerNetwork:
         """
         Calculate the cross-entropy loss function and its gradient
         """
-        # Take the sum over classes
-        l = np.sum(targets * p_out, axis=0)
-        # Compute the log
-        loss_batch = - np.log(l)
+        # Compute the loss for every class
+        loss_batch = - targets * np.log(p_out)
         # Take the mean over samples
-        loss_value = np.sum(loss_batch, axis=0) / self.n_batch
+        loss_value = np.sum(loss_batch) / self.n_batch
 
         # Compute the gradient of the loss
         loss_grad = - (targets - p_out)
