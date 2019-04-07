@@ -4,52 +4,54 @@ THIS FILE IS IDENTICAL IN MOST PARTS WITH THE RUN FILE FOUND IN ASSIGNMENT 1
 Created by Kostis S-Z @ 2019-03-27
 """
 
-import numpy as np
 from pathlib import Path
-from As1 import run
+from network2 import TwoLayerNetwork
+from data import load_data, preprocess_data, process_zero_mean
 
 parent_dir = str(Path.cwd().parent)  # Get the parent directory of the current working directory
 directory = parent_dir + "/cifar-10-batches-py"  # The dataset should be in the parent directory
 
 
 model_parameters = {
-    "eta": 0.01,  # learning rate
-    "n_batch": 100,  # size of data batches within an epoch
+    "eta_min": 0.001,  # min learning rate for cycle
+    "eta_max": 0.1,  # max learning rate for cycle
+    "n_s": 500,  # parameter variable for cyclical learning rate
+    "n_batch": 5,  # size of data batches within an epoch
     "n_nodes": 50,  # number of nodes (neurons) in the hidden layer
     "loss_type": "cross-entropy",  # cross-entropy or svm
+    "svm_margin": 1.,  # margin parameter for svm loss
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
-    "patience": 10  # how many epochs to wait before stopping training if the val_error is below min_delta
+    "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
 
 def main():
     # Use the loading function from Assignment 1
-    train_x, train_y, val_x, val_y, test_x, test_y = run.load_data()
+    train_x, train_y, val_x, val_y, test_x, test_y = load_data()
 
     # Use the preprocessing function from Assignment 1
-    train_x, train_y = run.preprocess_data(train_x, train_y)
-    val_x, val_y = run.preprocess_data(val_x, val_y)
-    test_x, test_y = run.preprocess_data(test_x, test_y)
+    train_x, train_y = preprocess_data(train_x, train_y)
+    val_x, val_y = preprocess_data(val_x, val_y)
+    test_x, test_y = preprocess_data(test_x, test_y)
 
     # Process the data so they have a zero mean
-    train_x, train_y = process_zero_mean(train_x)
-    val_x, val_y = process_zero_mean(val_x)
-    test_x, test_y = process_zero_mean(test_x)
+    train_x, val_x, test_x = process_zero_mean(train_x, val_x, test_x)
+
+    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
 
 def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
-    Train and test a multi-layer network
+    Train and test a two-layer network
     """
+    net = TwoLayerNetwork(**model_parameters)
 
+    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=True, verbose=True)
 
-def process_zero_mean(data):
-    """
-    Preprocess data to have a zero mean
-    :return: the processed data
-    """
-    return data
+    net.plot_loss()  # Plot the loss progress
+
+    net.test(test_x, test_y)
 
 
 if __name__ == "__main__":
