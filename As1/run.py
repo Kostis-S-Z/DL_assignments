@@ -56,7 +56,7 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     for i, name in labels_to_names.items():
         net.plot_weight_matrix(i, name)
 
-    test_accuracy = net.test(test_x, test_y)
+    test_loss, test_accuracy = net.test(test_x, test_y)
 
     print("Test accuracy: ", test_accuracy)
 

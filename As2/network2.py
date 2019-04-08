@@ -1,9 +1,10 @@
 """
-Created by Kostis S-Z @ 2019-03-27
+Created by Kostis S-Z @ 2019-04-03
 """
 
 
 import numpy as np
+from scipy.stats import mode
 from matplotlib import pyplot as plt
 
 
@@ -23,6 +24,9 @@ class TwoLayerNetwork:
             "loss_type": "svm",  # cross-entropy or svm
             "svm_margin": 1.,  # margin parameter for svm loss
             "lambda_reg": .1,  # regularizing term variable
+            "train_noisy": False,  # variable to toggle adding noise to the training data
+            "noise_m": 0,  # the mean of the gaussian noise added to the training data
+            "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
             "min_delta": 0.01,  # minimum accepted validation error
             "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
         }
@@ -36,6 +40,7 @@ class TwoLayerNetwork:
 
         self.w = []
         self.b = []
+        self.models = {}  # Variable to save the weights of the model at the end of each cycle to use it during ensemble
         self.eta = 0.01
         self.p_iter = 0
         self.prev_val_error = 0
@@ -78,7 +83,7 @@ class TwoLayerNetwork:
         self.b.append(np.array(hidden_bias))
         self.b.append(np.array(output_bias))
 
-    def train(self, data, labels, val_data, val_labels, n_epochs=100, early_stop=True, verbose=False):
+    def train(self, data, labels, val_data, val_labels, n_epochs=100, early_stop=True, ensemble=False, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
@@ -111,6 +116,9 @@ class TwoLayerNetwork:
                 batch_labels = labels[start:end].T  # Transpose so that classes x batch_size
                 batch_classes = np.argmax(batch_labels, axis=0)  # Convert from one-hot to integer form
 
+                if self.train_noisy:
+                    batch_data = self.apply_noise(batch_data)
+
                 # Run a forward pass in the network
                 # p_output: the result of the softmax function, the real output of the network
                 # class_output: by choosing the node with the highest probability we get the predicted class
@@ -119,8 +127,8 @@ class TwoLayerNetwork:
                 if self.loss_type == "svm":
                     prob_out = real_out
                 # Run a backward pass in the network, computing the loss and updating the weights
-                loss = self.backward(batch_data, prob_out, batch_labels)
-                av_loss += loss
+                #loss = self.backward(batch_data, prob_out, batch_labels)
+                #av_loss += loss
 
                 av_acc += self.accuracy(class_out, batch_classes)
 
@@ -131,6 +139,10 @@ class TwoLayerNetwork:
             if verbose:
                 print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
 
+            if ensemble:
+                if True: # If the cycle has ended, meaning it the model has reached a local minima TODO: fix condition
+                    self.models[0] = [self.w, self.b]  # Save weights & bias of the ith cycle  TODO: fix index
+
             if early_stop:
                 val_loss, val_acc = self.test(val_data, val_labels)
 
@@ -139,6 +151,9 @@ class TwoLayerNetwork:
                 val_error = 1 - val_acc
                 if self.early_stopping(val_error):
                     break
+
+        if len(self.models) == 0:  # if ensemble was disabled, just save the last model
+            self.models[0] = [self.w, self.b]
 
     def test(self, test_data, test_targets):
         """
@@ -150,24 +165,49 @@ class TwoLayerNetwork:
         test_average_acc = 0
         test_average_loss = 0
 
-        for batch in range(batch_epochs):
-            start = batch * self.n_batch
-            end = start + self.n_batch
+        models_out = {}
+        models_accuracy = {}
 
-            batch_data = test_data[start:end].T
-            batch_labels = test_targets[start:end].T
-            batch_classes = np.argmax(batch_labels, axis=0)
+        test_labels = np.argmax(test_targets, axis=1)  # Convert one-hot to integer
 
-            real_out, prob_out, class_out = self.forward(batch_data)
-            # In the case of the SVM loss you update the weights with the unfiltered output
-            if self.loss_type == "svm":
-                prob_out = real_out
-            loss, _ = self.loss(prob_out, batch_labels)
-            test_average_loss += loss
+        for i, model in self.models.items():
 
-            test_average_acc += self.accuracy(class_out, batch_classes)
+            self.w = model[0]  # use the weights of model i
+            self.b = model[1]  # use the bias of model i
 
-        return test_average_loss / batch_epochs, test_average_acc / batch_epochs
+            model_out = np.zeros(test_labels.shape)
+
+            for batch in range(batch_epochs):
+                start = batch * self.n_batch
+                end = start + self.n_batch
+
+                batch_data = test_data[start:end].T
+                batch_labels = test_targets[start:end].T
+
+                real_out, prob_out, class_out = self.forward(batch_data)
+                # In the case of the SVM loss you update the weights with the unfiltered output
+                if self.loss_type == "svm":
+                    prob_out = real_out
+
+                loss, _ = self.loss(prob_out, batch_labels)
+                test_average_loss += loss
+
+                model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
+
+            models_accuracy[i] = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
+            models_out[i] = model_out  # Save the output of the model
+
+        # Concatenate all results to a list
+        results = []
+        for i, model_results in models_out.items():
+            results.append(model_results)
+
+        # Take majority vote across models
+        average_out = mode(results, axis=0)[0]
+
+        test_average_acc = self.accuracy(average_out, test_labels)
+
+        return test_average_loss / batch_epochs, test_average_acc
 
     def forward(self, data):
         """
@@ -176,7 +216,7 @@ class TwoLayerNetwork:
         # calculate the hidden layer
         s1 = np.dot(self.w[0], data) + self.b[0]
         # apply ReLU activation function
-        h = np.maximum(0, s1)
+        h = self.relu(s1)
         # calculate the output layer
         s = np.dot(self.w[1], h) + self.b[1]
         # apply softmax activation function
@@ -224,6 +264,12 @@ class TwoLayerNetwork:
         """
         e_out = np.exp(out - np.max(out))
         return e_out / e_out.sum(axis=0)
+
+    def relu(self, out):
+        """
+        ReLU activation function
+        """
+        return np.maximum(0, out)
 
     def loss(self, p_out, targets):
         """
@@ -294,7 +340,15 @@ class TwoLayerNetwork:
         """
         return self.lambda_reg * np.sum(np.square(self.w))
 
-    def cycle_eta(self, cycle, l, n):
+    def apply_noise(self, batch):
+        """
+        Add small amount of geometric noise to the training images to force the model
+        to learn a more general representation of the data
+        :return: a noisy batch
+        """
+        return batch + np.random.normal(self.noise_m, self.noise_std, batch.shape)
+
+    def cycle_eta(self, cycle, l):
         """
         Calculate the learning rate for a specific cycle
         """
@@ -347,19 +401,18 @@ class TwoLayerNetwork:
         plt.ylabel('loss')
         plt.show()
 
-    def plot_weight_matrix(self, node, object_name):
+    def plot_image(self, image, title=""):
         """
-        Plot the learnt representation (weight matrix) of a node
+        Plot an image with a (optional) title
         """
+        image = image.reshape((32, 32, 3), order='F')
 
-        weights = self.w[node].reshape((32, 32, 3), order='F')  # Convert vector of features to image form
-
-        image = (weights - weights.min()) / (weights.max() - weights.min())
+        image = (image - image.min()) / (image.max() - image.min())
 
         image = np.rot90(image, 3)
 
         plt.imshow(image)
-        plt.title("Representation of node {} - {}".format(node, object_name))
+        plt.title(title)
         plt.xticks([])
         plt.yticks([])
         plt.show()

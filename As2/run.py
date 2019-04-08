@@ -20,6 +20,9 @@ model_parameters = {
     "n_nodes": 50,  # number of nodes (neurons) in the hidden layer
     "loss_type": "cross-entropy",  # cross-entropy or svm
     "svm_margin": 1.,  # margin parameter for svm loss
+    "train_noisy": False,  # variable to toggle adding noise to the training data
+    "noise_m": 0,  # the mean of the gaussian noise added to the training data
+    "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
     "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
@@ -47,11 +50,13 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     net = TwoLayerNetwork(**model_parameters)
 
-    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=True, verbose=True)
+    net.train(train_x, train_y, val_x, val_y, n_epochs=1, early_stop=False, verbose=True)
 
-    net.plot_loss()  # Plot the loss progress
+    # net.plot_loss()  # Plot the loss progress
 
-    net.test(test_x, test_y)
+    test_loss, test_accuracy = net.test(test_x, test_y)
+
+    print("Test accuracy: ", test_accuracy)
 
 
 if __name__ == "__main__":
