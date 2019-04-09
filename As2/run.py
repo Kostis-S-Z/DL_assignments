@@ -50,7 +50,7 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     net = TwoLayerNetwork(**model_parameters)
 
-    net.train(train_x, train_y, val_x, val_y, n_epochs=1, early_stop=False, verbose=True)
+    net.train(train_x, train_y, val_x, val_y, n_epochs=5, early_stop=False, ensemble=True, verbose=True)
 
     # net.plot_loss()  # Plot the loss progress
 

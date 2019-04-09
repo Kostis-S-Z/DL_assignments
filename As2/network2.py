@@ -127,8 +127,8 @@ class TwoLayerNetwork:
                 if self.loss_type == "svm":
                     prob_out = real_out
                 # Run a backward pass in the network, computing the loss and updating the weights
-                #loss = self.backward(batch_data, prob_out, batch_labels)
-                #av_loss += loss
+                loss = self.backward(batch_data, prob_out, batch_labels)
+                av_loss += loss
 
                 av_acc += self.accuracy(class_out, batch_classes)
 
@@ -141,7 +141,7 @@ class TwoLayerNetwork:
 
             if ensemble:
                 if True: # If the cycle has ended, meaning it the model has reached a local minima TODO: fix condition
-                    self.models[0] = [self.w, self.b]  # Save weights & bias of the ith cycle  TODO: fix index
+                    self.models[i] = [self.w, self.b]  # Save weights & bias of the ith cycle  TODO: fix index
 
             if early_stop:
                 val_loss, val_acc = self.test(val_data, val_labels)
@@ -162,20 +162,21 @@ class TwoLayerNetwork:
         n = test_data.shape[0]  # number of samples
         batch_epochs = int(n / self.n_batch)
 
-        test_average_acc = 0
-        test_average_loss = 0
-
         models_out = {}
         models_accuracy = {}
+        models_loss = {}
 
         test_labels = np.argmax(test_targets, axis=1)  # Convert one-hot to integer
 
+        # Train each model separately
         for i, model in self.models.items():
 
             self.w = model[0]  # use the weights of model i
             self.b = model[1]  # use the bias of model i
 
             model_out = np.zeros(test_labels.shape)
+
+            test_average_loss_i = 0  # Initialize average loss of model i
 
             for batch in range(batch_epochs):
                 start = batch * self.n_batch
@@ -185,17 +186,20 @@ class TwoLayerNetwork:
                 batch_labels = test_targets[start:end].T
 
                 real_out, prob_out, class_out = self.forward(batch_data)
+                model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
+
                 # In the case of the SVM loss you update the weights with the unfiltered output
                 if self.loss_type == "svm":
                     prob_out = real_out
 
                 loss, _ = self.loss(prob_out, batch_labels)
-                test_average_loss += loss
+                test_average_loss_i += loss
 
-                model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
-
+            models_loss[i] = test_average_loss_i / batch_epochs
             models_accuracy[i] = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
             models_out[i] = model_out  # Save the output of the model
+
+            print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
 
         # Concatenate all results to a list
         results = []
@@ -205,9 +209,12 @@ class TwoLayerNetwork:
         # Take majority vote across models
         average_out = mode(results, axis=0)[0]
 
+        # Average accuracy over all models
         test_average_acc = self.accuracy(average_out, test_labels)
+        # Average loss over all models
+        test_average_loss = np.sum(list(models_loss.values())) / batch_epochs
 
-        return test_average_loss / batch_epochs, test_average_acc
+        return test_average_loss, test_average_acc
 
     def forward(self, data):
         """
