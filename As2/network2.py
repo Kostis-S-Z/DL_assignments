@@ -21,18 +21,12 @@ class TwoLayerNetwork:
             "n_s": 500,  # parameter variable for cyclical learning rate
             "n_batch": 100,  # size of data batches within an epoch
             "n_nodes": 50,  # number of nodes (neurons) in the hidden layer
-            "loss_type": "svm",  # cross-entropy or svm
-            "svm_margin": 1.,  # margin parameter for svm loss
             "lambda_reg": .1,  # regularizing term variable
             "train_noisy": False,  # variable to toggle adding noise to the training data
             "noise_m": 0,  # the mean of the gaussian noise added to the training data
             "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
             "min_delta": 0.01,  # minimum accepted validation error
             "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
-        }
-        self.loss_function = {
-            "cross-entropy": self.cross_entropy,
-            "svm": self.svm_multi
         }
 
         for var, default in var_defaults.items():
@@ -122,12 +116,10 @@ class TwoLayerNetwork:
                 # Run a forward pass in the network
                 # p_output: the result of the softmax function, the real output of the network
                 # class_output: by choosing the node with the highest probability we get the predicted class
-                real_out, prob_out, class_out = self.forward(batch_data)
-                # In the case of the SVM loss you update the weights with the unfiltered output
-                if self.loss_type == "svm":
-                    prob_out = real_out
+                hidden_out, prob_out, class_out = self.forward(batch_data)
+
                 # Run a backward pass in the network, computing the loss and updating the weights
-                loss = self.backward(batch_data, prob_out, batch_labels)
+                loss = self.backward(hidden_out, batch_data, prob_out, batch_labels)
                 av_loss += loss
 
                 av_acc += self.accuracy(class_out, batch_classes)
@@ -140,8 +132,8 @@ class TwoLayerNetwork:
                 print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
 
             if ensemble:
-                if True: # If the cycle has ended, meaning it the model has reached a local minima TODO: fix condition
-                    self.models[i] = [self.w, self.b]  # Save weights & bias of the ith cycle  TODO: fix index
+                if True:  # If the cycle has ended, meaning it the model has reached a local minima TODO: fix condition
+                    self.models[i] = [self.w.copy(), self.b.copy()]  # Save weights & bias of the ith cycle  TODO: fix index
 
             if early_stop:
                 val_loss, val_acc = self.test(val_data, val_labels)
@@ -185,14 +177,10 @@ class TwoLayerNetwork:
                 batch_data = test_data[start:end].T
                 batch_labels = test_targets[start:end].T
 
-                real_out, prob_out, class_out = self.forward(batch_data)
+                _, prob_out, class_out = self.forward(batch_data)
                 model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
 
-                # In the case of the SVM loss you update the weights with the unfiltered output
-                if self.loss_type == "svm":
-                    prob_out = real_out
-
-                loss, _ = self.loss(prob_out, batch_labels)
+                loss, _ = self.cross_entropy_loss(prob_out, batch_labels)
                 test_average_loss_i += loss
 
             models_loss[i] = test_average_loss_i / batch_epochs
@@ -225,26 +213,26 @@ class TwoLayerNetwork:
         # apply ReLU activation function
         h = self.relu(s1)
         # calculate the output layer
-        s = np.dot(self.w[1], h) + self.b[1]
+        s2 = np.dot(self.w[1], h) + self.b[1]
         # apply softmax activation function
-        p = self.softmax(s)
+        p = self.softmax(s2)
         # predicted class is label with highest probability
         k = np.argmax(p, axis=0)
-        return s, p, k
+        return h, p, k
 
-    def backward(self, data, p_out, targets):
+    def backward(self, h, data, p_out, targets):
         """
         A backward pass in the network to update the weights with gradient descent
         """
         # Compute the loss and its gradient
-        loss, loss_out_grad = self.loss(p_out, targets)
+        loss, loss_out_grad = self.cross_entropy_loss(p_out, targets)
 
         # Add the L2 Regularization term (lambda * ||W||^2) to the loss
         loss = loss + self.reg()
 
         # Note: In this case (2-layer network) the index 1 and -1 can be used interchangeably
         # Calculate OUTPUT Layer weight and bias gradients
-        w_out_grad = np.dot(loss_out_grad, data.T) / self.n_batch
+        w_out_grad = np.dot(loss_out_grad, h.T) / self.n_batch
         b_out_grad = np.sum(loss_out_grad, axis=0) / self.n_batch
         # Compute gradient of regularization term w.r.t the OUTPUT weights
         reg_out_grad = 2 * self.lambda_reg * self.w[-1]
@@ -253,12 +241,10 @@ class TwoLayerNetwork:
         self.b[-1] = self.b[-1] - self.eta * b_out_grad
 
         # Calculate HIDDEN Layer loss gradient
-        # TODO: Should you calculate this gradient BEFORE or AFTER you update the previous weights
-        # TODO: Is the dot product with the weights of the OUTPUT layer or the HIDDEN layer
-        loss_h_grad = np.dot(loss_out_grad, self.w[-1])
-        # TODO: fix this line diag( Ind (data > 0) )
-        data_pr = data
-        loss_h_grad = loss_h_grad * data_pr
+        loss_h_grad = np.dot(self.w[-1].T, loss_out_grad)  # Output layer weights x Loss gradient
+
+        indicator = h > 0  # Get a binary representation of values higher than zero (1) or below zero (0)
+        loss_h_grad = loss_h_grad * indicator
 
         # Calculate HIDDEN Layer weight and bias gradients
         w_h_grad = np.dot(loss_h_grad, data.T) / self.n_batch
@@ -293,7 +279,7 @@ class TwoLayerNetwork:
         function = self.loss_function[self.loss_type]
         return function(p_out, targets)
 
-    def cross_entropy(self, p_out, targets):
+    def cross_entropy_loss(self, p_out, targets):
         """
         Calculate the cross-entropy loss function and its gradient
         """
@@ -305,48 +291,6 @@ class TwoLayerNetwork:
         # Compute the gradient of the loss for the output layer
         loss_grad = - (targets - p_out)
 
-        return loss_value, loss_grad
-
-    def svm_multi(self, p_out, targets):
-        """
-        Calculate the SVM multi-class loss function and its gradient
-        """
-        # Convert the one-hot back to integer representation
-        targets_class = np.argmax(targets, axis=0)
-        # Get list of indices for the batch samples
-        indices = np.arange(self.n_batch)
-        # Transpose the output matrix to get the correct dimensions
-        p_out_t = p_out.T
-        # For every batch get its score (probability) for the actual (target) class it belongs to
-        correct_p = p_out_t[indices, targets_class]
-        # For every sample prediction in the batch
-        # subtract from each class the number of prediction of the correct class, phew that's a mouthful...
-        sub_p = p_out - correct_p
-        # Add a margin parameter
-        sub_p = sub_p + self.svm_margin
-        # Replace negative values with zero
-        margins = np.maximum(0, sub_p)
-        # Transpose the margins matrix to get the correct dimensions
-        margins = margins.T
-        # Replace the correct class predictions with zero
-        margins[indices, targets_class] = 0
-        # Sum over classes
-        sum = np.sum(margins, axis=1)
-        # Take the mean loss over the batch samples
-        loss_value = np.mean(sum)
-
-        # Compute the gradient SVM loss
-        margins_b = margins
-        # Convert to binary values: 1 -> weights need to updated (wrong predictions) 0 -> weights not to update
-        margins_b[margins > 0] = 1
-        # Sum over the samples for every class
-        wrongs_per_class = np.sum(margins_b, axis=1)
-        # Convert the matrix and the vector to correct forms
-        margins_b = margins_b
-        # At each class subtract the number of the wrongly predicted samples
-        margins_b[indices, targets_class] = - wrongs_per_class
-        # Transpose it back
-        loss_grad = margins_b.T
         return loss_value, loss_grad
 
     def reg(self):

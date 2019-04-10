@@ -16,10 +16,8 @@ model_parameters = {
     "eta_min": 0.001,  # min learning rate for cycle
     "eta_max": 0.1,  # max learning rate for cycle
     "n_s": 500,  # parameter variable for cyclical learning rate
-    "n_batch": 5,  # size of data batches within an epoch
+    "n_batch": 200,  # size of data batches within an epoch
     "n_nodes": 50,  # number of nodes (neurons) in the hidden layer
-    "loss_type": "cross-entropy",  # cross-entropy or svm
-    "svm_margin": 1.,  # margin parameter for svm loss
     "train_noisy": False,  # variable to toggle adding noise to the training data
     "noise_m": 0,  # the mean of the gaussian noise added to the training data
     "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
@@ -50,7 +48,7 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     net = TwoLayerNetwork(**model_parameters)
 
-    net.train(train_x, train_y, val_x, val_y, n_epochs=5, early_stop=False, ensemble=True, verbose=True)
+    net.train(train_x, train_y, val_x, val_y, n_epochs=40, early_stop=False, ensemble=True, verbose=True)
 
     # net.plot_loss()  # Plot the loss progress
 
