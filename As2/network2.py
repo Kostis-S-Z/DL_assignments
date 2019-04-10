@@ -237,30 +237,37 @@ class TwoLayerNetwork:
         A backward pass in the network to update the weights with gradient descent
         """
         # Compute the loss and its gradient
-        loss, loss_grad = self.loss(p_out, targets)
+        loss, loss_out_grad = self.loss(p_out, targets)
 
         # Add the L2 Regularization term (lambda * ||W||^2) to the loss
         loss = loss + self.reg()
 
-        # Compute the gradient w.r.t the weights
-        #   -> inner product (sum) of the loss*data_inputs
-        w_grad = np.dot(loss_grad, data.T)
+        # Note: In this case (2-layer network) the index 1 and -1 can be used interchangeably
+        # Calculate OUTPUT Layer weight and bias gradients
+        w_out_grad = np.dot(loss_out_grad, data.T) / self.n_batch
+        b_out_grad = np.sum(loss_out_grad, axis=0) / self.n_batch
+        # Compute gradient of regularization term w.r.t the OUTPUT weights
+        reg_out_grad = 2 * self.lambda_reg * self.w[-1]
+        # Update OUTPUT Layer weights and bias
+        self.w[-1] = self.w[-1] - self.eta * (w_out_grad + reg_out_grad)
+        self.b[-1] = self.b[-1] - self.eta * b_out_grad
 
-        # Compute the gradient w.r.t the bias
-        #   -> inner product (sum) of the loss*bias_inputs where bias_inputs is a vector of 1s, each for every sample
-        #   -> its basically the same as doing np.sum(loss_grad, axis=1)
-        b_grad = np.sum(loss_grad, axis=0)  # np.dot(loss_grad, np.ones((self.n_batch, 1)))
+        # Calculate HIDDEN Layer loss gradient
+        # TODO: Should you calculate this gradient BEFORE or AFTER you update the previous weights
+        # TODO: Is the dot product with the weights of the OUTPUT layer or the HIDDEN layer
+        loss_h_grad = np.dot(loss_out_grad, self.w[-1])
+        # TODO: fix this line diag( Ind (data > 0) )
+        data_pr = data
+        loss_h_grad = loss_h_grad * data_pr
 
-        # Divide with the size of the batch
-        w_grad = w_grad / self.n_batch
-        b_grad = b_grad / self.n_batch
-
-        # Compute gradient of regularization term w.r.t the weights
-        reg_grad = 2 * self.lambda_reg * self.w
-
-        # Update weights and bias
-        self.w = self.w - self.eta * (w_grad + reg_grad)
-        self.b = self.b - self.eta * b_grad
+        # Calculate HIDDEN Layer weight and bias gradients
+        w_h_grad = np.dot(loss_h_grad, data.T) / self.n_batch
+        b_h_grad = np.sum(loss_h_grad, axis=0) / self.n_batch
+        # Compute gradient of regularization term w.r.t the HIDDEN weights
+        reg_h_grad = 2 * self.lambda_reg * self.w[0]
+        # Update HIDDEN Layer weights and bias
+        self.w[0] = self.w[0] - self.eta * (w_h_grad + reg_h_grad)
+        self.b[0] = self.b[0] - self.eta * b_h_grad
 
         return loss
 
@@ -295,8 +302,9 @@ class TwoLayerNetwork:
         # Take the mean over samples
         loss_value = np.sum(loss_batch) / self.n_batch
 
-        # Compute the gradient of the loss
+        # Compute the gradient of the loss for the output layer
         loss_grad = - (targets - p_out)
+
         return loss_value, loss_grad
 
     def svm_multi(self, p_out, targets):
@@ -344,8 +352,9 @@ class TwoLayerNetwork:
     def reg(self):
         """
         Compute the regularization term, in this case L2: lambda * ||W||^2
+        using the weights of the OUTPUT layer
         """
-        return self.lambda_reg * np.sum(np.square(self.w))
+        return self.lambda_reg * np.sum(np.square(self.w[-1]))
 
     def apply_noise(self, batch):
         """
