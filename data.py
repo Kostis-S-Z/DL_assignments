@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 from pathlib import Path
 
 
@@ -6,7 +7,7 @@ parent_dir = str(Path.cwd().parent)  # Get the parent directory of the current w
 directory = parent_dir + "/cifar-10-batches-py"  # The dataset should be in the parent directory
 
 
-def load_data():
+def load_data(use_all=False):
     """
     for this assignment we use the data in the following way:
     training data: batch 1
@@ -23,16 +24,17 @@ def load_data():
         The number at index i indicates the label of the ith image in the array data.
     :return: the data with their labels
     """
-    import pickle
 
-    train_file = directory + "/data_batch_1"
+    if use_all:
+        train_data, val_data = load_and_merge()
+    else:
+        train_file = directory + "/data_batch_1"
+        with open(train_file, 'rb') as fo:
+            train_data = pickle.load(fo, encoding='bytes')
 
-    with open(train_file, 'rb') as fo:
-        train_data = pickle.load(fo, encoding='bytes')
-
-    val_file = directory + "/data_batch_2"
-    with open(val_file, 'rb') as fo:
-        val_data = pickle.load(fo, encoding='bytes')
+        val_file = directory + "/data_batch_2"
+        with open(val_file, 'rb') as fo:
+            val_data = pickle.load(fo, encoding='bytes')
 
     test_file = directory + "/test_batch"
     with open(test_file, 'rb') as fo:
@@ -40,6 +42,41 @@ def load_data():
 
     return train_data[b"data"], train_data[b"labels"], val_data[b"data"], \
         val_data[b"labels"], test_data[b"data"], test_data[b"labels"]
+
+
+def load_and_merge():
+    """
+    Load all batches of data. Set aside 5000 samples for validation
+    """
+    main_file = directory + "/data_batch_"
+
+    file_1 = main_file + "1"
+    with open(file_1, 'rb') as fo:
+        batch_1 = pickle.load(fo, encoding='bytes')
+
+    data = batch_1[b"data"]
+    labels = batch_1[b"labels"]
+
+    # Load all 5 batches
+    for i in range(2, 6):
+        file = main_file + str(i)
+
+        with open(file, 'rb') as fo:
+            batch_i = pickle.load(fo, encoding='bytes')
+
+        data = np.vstack((data, batch_i[b"data"]))
+        labels = labels + batch_i[b"labels"]
+
+    # Use the same format of dictionary
+    train_data = dict()
+    val_data = dict()
+    # Use the first 45.000 data for training and the rest 5.000 for validation
+    train_data[b"data"] = data[:45000]
+    train_data[b"labels"] = labels[:45000]
+    val_data[b"data"] = data[45000:]
+    val_data[b"labels"] = labels[45000:]
+
+    return train_data, val_data
 
 
 def preprocess_data(data, labels):

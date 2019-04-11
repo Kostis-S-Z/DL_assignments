@@ -29,7 +29,7 @@ model_parameters = {
 
 def main():
     # Use the loading function from Assignment 1
-    train_x, train_y, val_x, val_y, test_x, test_y = load_data()
+    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=True)
 
     # Use the preprocessing function from Assignment 1
     train_x, train_y = preprocess_data(train_x, train_y)

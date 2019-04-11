@@ -91,6 +91,8 @@ class TwoLayerNetwork:
 
         self.loss_train_av_history = []
 
+        iteration = 0
+
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
@@ -101,10 +103,13 @@ class TwoLayerNetwork:
             av_acc = 0  # Average epoch accuracy
             av_loss = 0  # Average epoch loss
 
-            self.eta = self.cycle_eta(i)
-            print(self.eta)
-
             for batch in range(batch_epochs):
+                # Calculate a new learning rate based on the CLR method
+                cycle = 1  # One cycle should correspond to around 10 epochs
+                self.eta = self.cycle_eta(iteration, cycle)
+                iteration += 1
+                print(self.eta)
+
                 start = batch * self.n_batch
                 end = start + self.n_batch
 
@@ -311,22 +316,18 @@ class TwoLayerNetwork:
         """
         return batch + np.random.normal(self.noise_m, self.noise_std, batch.shape)
 
-    def cycle_eta(self, epoch):
+    def cycle_eta(self, iteration, cycle):
         """
         Calculate the learning rate for a specific cycle
         """
-        numer = 1 + epoch
-        denom = 2 * self.n_s
-        cycle = np.floor(numer / denom)
+        diff = self.eta_max - self.eta_min
 
-        part1 = epoch / self.n_s
-        part2 = 2 * cycle + 1
+        part1 = iteration / self.n_s
+        part2 = (2 * cycle) + 1
         x = np.abs(part1 - part2)
 
-        diff = self.eta_max - self.eta_min
-        e_p = diff * np.max(0, (1 - x))
+        new_eta = self.eta_min + diff * np.maximum(0, (1 - x))
 
-        new_eta = self.eta_min + e_p
         return new_eta
 
     def early_stopping(self, val_error):
