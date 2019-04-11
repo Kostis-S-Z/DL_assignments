@@ -14,10 +14,6 @@ The goal of this assignment was to build a Single Layer Neural Network from scra
 - Grid Search for optimal hyper parameter tuning
 - Plot loss progress & learnt class representations (weight matrices)
 
-##### TODO:
-
-- Fix SVM Multi-class loss
-
 
 ### Assignment 2: Expanding to a Two-Layer Neural Network
 
@@ -27,7 +23,13 @@ Next, we expand the network to use two layers and cyclical learning rates.
 
 - Pre-process data to a zero mean
 - Cyclical Learning rates
+- Extensive search for optimal value of regularisation term
+
+
+### Assignment 3: Expanding (even more!) to a Multi-Layer Neural Network + BatchNormalisation
 
 ##### Features:
 
-##### TODO:
+- Easy way to setup whole structure of network
+- Batch Normalization
+
