@@ -101,6 +101,9 @@ class TwoLayerNetwork:
             av_acc = 0  # Average epoch accuracy
             av_loss = 0  # Average epoch loss
 
+            self.eta = self.cycle_eta(i)
+            print(self.eta)
+
             for batch in range(batch_epochs):
                 start = batch * self.n_batch
                 end = start + self.n_batch
@@ -308,15 +311,23 @@ class TwoLayerNetwork:
         """
         return batch + np.random.normal(self.noise_m, self.noise_std, batch.shape)
 
-    def cycle_eta(self, cycle, l):
+    def cycle_eta(self, epoch):
         """
         Calculate the learning rate for a specific cycle
         """
-        #TODO: Finish this
-        numer = cycle - (2 * l * self.n_s)
+        numer = 1 + epoch
+        denom = 2 * self.n_s
+        cycle = np.floor(numer / denom)
+
+        part1 = epoch / self.n_s
+        part2 = 2 * cycle + 1
+        x = np.abs(part1 - part2)
+
         diff = self.eta_max - self.eta_min
-        new_eta = self.eta_min + (numer / self.n_s) * diff
-        self.eta = new_eta
+        e_p = diff * np.max(0, (1 - x))
+
+        new_eta = self.eta_min + e_p
+        return new_eta
 
     def early_stopping(self, val_error):
         """
