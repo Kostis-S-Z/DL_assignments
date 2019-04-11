@@ -143,17 +143,19 @@ class TwoLayerNetwork:
                 if True:  # If the cycle has ended, meaning it the model has reached a local minima TODO: fix condition
                     self.models[i] = [self.w.copy(), self.b.copy()]  # Save weights & bias of the ith cycle  TODO: fix index
 
+            val_loss, val_acc = self.test(val_data, val_labels)
+
+            self.loss_val_av_history.append(val_loss)
+
             if early_stop:
-                val_loss, val_acc = self.test(val_data, val_labels)
-
-                self.loss_val_av_history.append(val_loss)
-
                 val_error = 1 - val_acc
                 if self.early_stopping(val_error):
                     break
 
         if len(self.models) == 0:  # if ensemble was disabled, just save the last model
             self.models[0] = [self.w, self.b]
+
+        return val_acc
 
     def test(self, test_data, test_targets):
         """

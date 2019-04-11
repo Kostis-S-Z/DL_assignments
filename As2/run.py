@@ -4,6 +4,7 @@ THIS FILE IS IDENTICAL IN MOST PARTS WITH THE RUN FILE FOUND IN ASSIGNMENT 1
 Created by Kostis S-Z @ 2019-03-27
 """
 
+import numpy as np
 from pathlib import Path
 from network2 import TwoLayerNetwork
 from data import load_data, preprocess_data, process_zero_mean
@@ -41,6 +42,8 @@ def main():
 
     train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
+    best_lambda = lambda_search(train_x, train_y, val_x, val_y)
+
 
 def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
@@ -55,6 +58,45 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     test_loss, test_accuracy = net.test(test_x, test_y)
 
     print("Test accuracy: ", test_accuracy)
+
+
+def lambda_search(train_x, train_y, val_x, val_y):
+    """
+    Search for the optimal lambda
+    """
+
+    lambda_reg_coarse = [0.001, 0.01, 0.05, 0.1]
+    lambda_reg_medium = np.arange(0.0001, 0.2, 0.05)
+    lambda_reg_fine = np.arange(0.0001, 0.2, 0.005)
+
+    lambda_reg_s = lambda_reg_coarse
+
+    results = {}
+    optimal_lambda = 0
+    best_model_accuracy = 0.
+
+    epochs = 50
+    cycle = 2
+    model_parameters["n_s"] = 2 * int(epochs / model_parameters["n_batch"])
+
+    for lambda_reg in lambda_reg_s:
+        model_parameters["lambda_reg"] = lambda_reg
+
+        net = TwoLayerNetwork(**model_parameters)
+
+        val_accuracy = net.train(train_x, train_y, val_x, val_y, n_epochs=epochs, early_stop=False, verbose=False)
+
+        val_acc = round(val_accuracy * 100, 1)
+        print("Lambda: {} | Test accuracy: {}".format(lambda_reg, val_acc))
+
+        results[lambda_reg] = val_accuracy
+
+        if val_accuracy > best_model_accuracy:
+            best_model_accuracy = val_accuracy
+            optimal_lambda = lambda_reg
+
+    print("Optimal lambda: {} with test accuracy: {}".format(optimal_lambda, best_model_accuracy))
+    return optimal_lambda
 
 
 if __name__ == "__main__":
