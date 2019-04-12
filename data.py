@@ -7,7 +7,7 @@ parent_dir = str(Path.cwd().parent)  # Get the parent directory of the current w
 directory = parent_dir + "/cifar-10-batches-py"  # The dataset should be in the parent directory
 
 
-def load_data(use_all=False):
+def load_data(use_all=False, val_size=5000):
     """
     for this assignment we use the data in the following way:
     training data: batch 1
@@ -26,7 +26,7 @@ def load_data(use_all=False):
     """
 
     if use_all:
-        train_data, val_data = load_and_merge()
+        train_data, val_data = load_and_merge(val_size)
     else:
         train_file = directory + "/data_batch_1"
         with open(train_file, 'rb') as fo:
@@ -44,7 +44,7 @@ def load_data(use_all=False):
         val_data[b"labels"], test_data[b"data"], test_data[b"labels"]
 
 
-def load_and_merge():
+def load_and_merge(val_size):
     """
     Load all batches of data. Set aside 5000 samples for validation
     """
@@ -70,11 +70,12 @@ def load_and_merge():
     # Use the same format of dictionary
     train_data = dict()
     val_data = dict()
-    # Use the first 45.000 data for training and the rest 5.000 for validation
-    train_data[b"data"] = data[:45000]
-    train_data[b"labels"] = labels[:45000]
-    val_data[b"data"] = data[45000:]
-    val_data[b"labels"] = labels[45000:]
+    # Use the first X-validation_size data for training and the rest X-validation_size for validation
+    data_index = len(data) - val_size
+    train_data[b"data"] = data[:data_index]
+    train_data[b"labels"] = labels[:data_index]
+    val_data[b"data"] = data[data_index:]
+    val_data[b"labels"] = labels[data_index:]
 
     return train_data, val_data
 
@@ -95,7 +96,6 @@ def process_zero_mean(train, val, test):
     Preprocess data to have a zero mean based on the mean of the training data
     :return: the processed data
     """
-    # TODO: make sure this is the correct way of doing this
     mean = np.mean(train)
     std = np.std(train)
     train_t = (train - mean) / std
