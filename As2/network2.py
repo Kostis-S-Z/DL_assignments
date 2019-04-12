@@ -306,9 +306,9 @@ class TwoLayerNetwork:
     def reg(self):
         """
         Compute the regularization term, in this case L2: lambda * ||W||^2
-        using the weights of the OUTPUT layer
+        using the weights of BOTH layers
         """
-        return self.lambda_reg * np.sum(np.square(self.w[-1]))
+        return self.lambda_reg * (np.sum(np.square(self.w[-1])) + np.sum(np.square(self.w[0])))
 
     def apply_noise(self, batch):
         """
