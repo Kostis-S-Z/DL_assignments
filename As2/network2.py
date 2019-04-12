@@ -12,15 +12,14 @@ class TwoLayerNetwork:
 
     def __init__(self, **kwargs):
         """
-        Initialize Neural Network with data and parameters
+        Initialize a two layer Neural Network with parameters
         """
 
         var_defaults = {
-            "eta_min": 0.001,  # min learning rate for cycle
-            "eta_max": 0.1,  # max learning rate for cycle
+            "eta_min": 1e-5,  # min learning rate for cycle
+            "eta_max": 1e-1,  # max learning rate for cycle
             "n_s": 500,  # parameter variable for cyclical learning rate
             "n_batch": 100,  # size of data batches within an epoch
-            "n_nodes": 50,  # number of nodes (neurons) in the hidden layer
             "lambda_reg": .1,  # regularizing term variable
             "train_noisy": False,  # variable to toggle adding noise to the training data
             "noise_m": 0,  # the mean of the gaussian noise added to the training data
@@ -35,64 +34,51 @@ class TwoLayerNetwork:
         self.w = []
         self.b = []
         self.models = {}  # Variable to save the weights of the model at the end of each cycle to use it during ensemble
-        self.eta = 0.01
         self.p_iter = 0
+        self.eta = 0.01
         self.prev_val_error = 0
         self.loss_train_av_history = []
         self.loss_val_av_history = []
+        self.eta_history = []
 
-    def init_weights(self, d, k):
+    def init_weights(self, net_structure, d):
         """
-        Initialize a weight matrix for the hidden and the output layer
-        hidden layer: hidden nodes (m) x features (d) with a bias vector of hidden nodes (m) x 1
-        output layer: output nodes (k) x hidden nodes (m) with a bias vector of output nodes (k) x 1
+        Initialize a weight matrix for the hidden and the output layers
         """
         mean = 0
-        std_hidden = 1 / np.sqrt(d)
-        std_output = 1 / np.sqrt(self.n_nodes)
 
-        # Initialize hidden layer weights
-        hidden_layer = []
+        dim_prev_layer = d
+        # For every layer (including the output)
+        for l in range(len(net_structure)):
+            # Calculate standard deviation to initialise the weights of layer i
+            std = 1 / np.sqrt(dim_prev_layer)
+            # Initialize weight matrix of layer i
+            w_layer_i = np.random.normal(mean, std, (net_structure[l], dim_prev_layer))
+            # Initialize bias column vector of layer i
+            hidden_bias = np.zeros(net_structure[l]).reshape(-1, 1)
+            # The second dimension of the weight matrix of the next layer is the number of nodes of the current one
+            dim_prev_layer = net_structure[l]
 
-        for i in range(self.n_nodes):
-            w_i = np.random.normal(mean, std_hidden, d)  # Node i of hidden layer
-            hidden_layer.append(w_i)
+            # Add weights & bias to network
+            self.w.append(np.array(w_layer_i))
+            self.b.append(np.array(hidden_bias))
 
-        # Initialize bias column vector of hidden layer
-        hidden_bias = np.zeros(self.n_nodes).reshape(-1, 1)
-
-        # Initialize output layer weights
-        output_layer = []
-
-        for i in range(k):
-            w_i = np.random.normal(mean, std_output, self.n_nodes)  # Node i of output layer
-            output_layer.append(w_i)
-
-        # Initialize bias column vector of output layer
-        output_bias = np.zeros(k).reshape(-1, 1)
-
-        self.w.append(np.array(hidden_layer))
-        self.w.append(np.array(output_layer))
-
-        self.b.append(np.array(hidden_bias))
-        self.b.append(np.array(output_bias))
-
-    def train(self, data, labels, val_data, val_labels, n_epochs=100, early_stop=True, ensemble=False, verbose=False):
+    def train(self, network_structure, data, labels, val_data, val_labels,
+              n_epochs=100, early_stop=True, ensemble=False, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
         n = data.shape[0]  # number of samples
         d = data.shape[1]  # number of features
-        k = 10  # number of outputs / classes
         indices = np.arange(n)  # a list of the indices of the data to shuffle
-        self.init_weights(d, k)
+        self.init_weights(network_structure, d)
 
         batch_epochs = int(n / self.n_batch)
 
         self.loss_train_av_history = []
+        self.eta_history = []
 
         iteration = 0
-
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
@@ -105,10 +91,9 @@ class TwoLayerNetwork:
 
             for batch in range(batch_epochs):
                 # Calculate a new learning rate based on the CLR method
-                cycle = 1  # One cycle should correspond to around 10 epochs
-                self.eta = self.cycle_eta(iteration, cycle)
+                self.eta = self.cycle_eta(iteration)
+                self.eta_history.append(self.eta)
                 iteration += 1
-                print(self.eta)
 
                 start = batch * self.n_batch
                 end = start + self.n_batch
@@ -122,15 +107,22 @@ class TwoLayerNetwork:
                     batch_data = self.apply_noise(batch_data)
 
                 # Run a forward pass in the network
-                # p_output: the result of the softmax function, the real output of the network
+                # layers_out: the output of each layer
                 # class_output: by choosing the node with the highest probability we get the predicted class
-                hidden_out, prob_out, class_out = self.forward(batch_data)
+                layers_out, class_out = self.forward(batch_data)
 
                 # Run a backward pass in the network, computing the loss and updating the weights
-                loss = self.backward(hidden_out, batch_data, prob_out, batch_labels)
+                loss = self.backward(layers_out, batch_data, batch_labels)
                 av_loss += loss
 
                 av_acc += self.accuracy(class_out, batch_classes)
+
+                if ensemble:
+                    # If the cycle has ended, the learning rate will be at its lowest
+                    # meaning it the model has reached a local minima
+                    if self.eta == self.eta_min:
+                        # Save weights & bias of the ith cycle
+                        self.models[i] = [self.w.copy(), self.b.copy()]
 
             average_epoch_loss = av_loss / batch_epochs
             average_epoch_acc = av_acc / batch_epochs
@@ -139,9 +131,8 @@ class TwoLayerNetwork:
             if verbose:
                 print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
 
-            if ensemble:
-                if True:  # If the cycle has ended, meaning it the model has reached a local minima TODO: fix condition
-                    self.models[i] = [self.w.copy(), self.b.copy()]  # Save weights & bias of the ith cycle  TODO: fix index
+            if not ensemble:
+                self.models[0] = [self.w, self.b]  # if ensemble was disabled, just save the last model
 
             val_loss, val_acc = self.test(val_data, val_labels)
 
@@ -151,9 +142,6 @@ class TwoLayerNetwork:
                 val_error = 1 - val_acc
                 if self.early_stopping(val_error):
                     break
-
-        if len(self.models) == 0:  # if ensemble was disabled, just save the last model
-            self.models[0] = [self.w, self.b]
 
         return val_acc
 
@@ -187,17 +175,17 @@ class TwoLayerNetwork:
                 batch_data = test_data[start:end].T
                 batch_labels = test_targets[start:end].T
 
-                _, prob_out, class_out = self.forward(batch_data)
+                layers_out, class_out = self.forward(batch_data)
                 model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
 
-                loss, _ = self.cross_entropy_loss(prob_out, batch_labels)
+                loss, _ = self.cross_entropy_loss(layers_out[-1], batch_labels)
                 test_average_loss_i += loss
 
             models_loss[i] = test_average_loss_i / batch_epochs
             models_accuracy[i] = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
             models_out[i] = model_out  # Save the output of the model
 
-            print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
+            # print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
 
         # Concatenate all results to a list
         results = []
@@ -210,7 +198,7 @@ class TwoLayerNetwork:
         # Average accuracy over all models
         test_average_acc = self.accuracy(average_out, test_labels)
         # Average loss over all models
-        test_average_loss = np.sum(list(models_loss.values())) / batch_epochs
+        test_average_loss = np.sum(list(models_loss.values())) / len(models_loss)
 
         return test_average_loss, test_average_acc
 
@@ -218,52 +206,74 @@ class TwoLayerNetwork:
         """
         A forward pass in the network computing the predicted class
         """
-        # calculate the hidden layer
-        s1 = np.dot(self.w[0], data) + self.b[0]
-        # apply ReLU activation function
-        h = self.relu(s1)
+        layers_out = []
+        input_of_layer = data
+        for layer in range(len(self.w) - 1):
+            # calculate the ith hidden layer
+            s_i = np.dot(self.w[layer], input_of_layer) + self.b[layer]
+            # apply ReLU activation function
+            h_i = self.relu(s_i)
+            # save the output of that layer
+            layers_out.append(h_i)
+            # set the output of this hidden layer to be the input of the next
+            input_of_layer = h_i
+
         # calculate the output layer
-        s2 = np.dot(self.w[1], h) + self.b[1]
+        s_out = np.dot(self.w[-1], input_of_layer) + self.b[-1]
         # apply softmax activation function
-        p = self.softmax(s2)
+        p = self.softmax(s_out)
+        # save the output of the output layer
+        layers_out.append(p)
         # predicted class is label with highest probability
         k = np.argmax(p, axis=0)
-        return h, p, k
+        return layers_out, k
 
-    def backward(self, h, data, p_out, targets):
+    def backward(self, l_out, data, targets):
         """
         A backward pass in the network to update the weights with gradient descent
         """
-        # Compute the loss and its gradient
-        loss, loss_out_grad = self.cross_entropy_loss(p_out, targets)
+        # Compute the loss and its gradient using the network predictions and the real targets
+        loss, loss_out_grad = self.cross_entropy_loss(l_out[-1], targets)
 
         # Add the L2 Regularization term (lambda * ||W||^2) to the loss
         loss = loss + self.reg()
 
-        # Note: In this case (2-layer network) the index 1 and -1 can be used interchangeably
-        # Calculate OUTPUT Layer weight and bias gradients
-        w_out_grad = np.dot(loss_out_grad, h.T) / self.n_batch
-        b_out_grad = np.sum(loss_out_grad, axis=0) / self.n_batch
-        # Compute gradient of regularization term w.r.t the OUTPUT weights
-        reg_out_grad = 2 * self.lambda_reg * self.w[-1]
-        # Update OUTPUT Layer weights and bias
-        self.w[-1] = self.w[-1] - self.eta * (w_out_grad + reg_out_grad)
-        self.b[-1] = self.b[-1] - self.eta * b_out_grad
+        # Copy the loss gradient of the output layer to use it for the update
+        loss_i_grad = loss_out_grad.copy()
+        # Initialize list to save the gradients
+        weights_grads = [None] * len(l_out)
+        bias_grads = [None] * len(l_out)
+        # Update backwards, from output layer to SECOND layer. The first layer is dependent on the data
+        for layer_i in range(len(l_out)-1, 0, -1):
+            # Calculate layer weight gradient based on the loss of that layer and the input of that layer
+            w_i_grad = np.dot(loss_i_grad, l_out[layer_i-1].T) / self.n_batch
+            # Calculate layer bias gradient based on its loss
+            b_i_grad = np.sum(loss_i_grad, axis=0) / self.n_batch
+            # Compute gradient of regularization term w.r.t the OUTPUT weights
+            reg_i_grad = 2 * self.lambda_reg * self.w[layer_i]
+            # Save the gradients
+            weights_grads[layer_i] = w_i_grad + reg_i_grad
+            bias_grads[layer_i] = b_i_grad
 
-        # Calculate HIDDEN Layer loss gradient
-        loss_h_grad = np.dot(self.w[-1].T, loss_out_grad)  # Output layer weights x Loss gradient
+            # Calculate loss gradient of previous layer
+            loss_i_grad = np.dot(self.w[layer_i].T, loss_i_grad)  # Current (Next) layer's weights x current gradient
+            indicator = l_out[layer_i-1] > 0  # indicator based on output previous layer output
+            loss_i_grad = loss_i_grad * indicator
 
-        indicator = h > 0  # Get a binary representation of values higher than zero (1) or below zero (0)
-        loss_h_grad = loss_h_grad * indicator
+        # Calculate FIRST hidden layer weight and bias gradients
+        w_0_grad = np.dot(loss_i_grad, data.T) / self.n_batch
+        # Calculate layer bias gradient based on its loss
+        b_0_grad = np.sum(loss_i_grad, axis=0) / self.n_batch
+        # Compute gradient of regularization term
+        reg_0_grad = 2 * self.lambda_reg * self.w[0]
+        # Save the gradients
+        weights_grads[0] = w_0_grad + reg_0_grad
+        bias_grads[0] = b_0_grad
 
-        # Calculate HIDDEN Layer weight and bias gradients
-        w_h_grad = np.dot(loss_h_grad, data.T) / self.n_batch
-        b_h_grad = np.sum(loss_h_grad, axis=0) / self.n_batch
-        # Compute gradient of regularization term w.r.t the HIDDEN weights
-        reg_h_grad = 2 * self.lambda_reg * self.w[0]
-        # Update HIDDEN Layer weights and bias
-        self.w[0] = self.w[0] - self.eta * (w_h_grad + reg_h_grad)
-        self.b[0] = self.b[0] - self.eta * b_h_grad
+        # Update backwards
+        for i in range(len(weights_grads)-1, -1, -1):
+            self.w[i] = self.w[i] - self.eta * weights_grads[i]
+            self.b[i] = self.b[i] - self.eta * bias_grads[i]
 
         return loss
 
@@ -318,17 +328,19 @@ class TwoLayerNetwork:
         """
         return batch + np.random.normal(self.noise_m, self.noise_std, batch.shape)
 
-    def cycle_eta(self, iteration, cycle):
+    def cycle_eta(self, iteration):
         """
         Calculate the learning rate for a specific cycle
         """
+        cycle = iteration % (self.n_s * 2)
         diff = self.eta_max - self.eta_min
 
-        part1 = iteration / self.n_s
-        part2 = (2 * cycle) + 1
-        x = np.abs(part1 - part2)
-
-        new_eta = self.eta_min + diff * np.maximum(0, (1 - x))
+        if cycle < self.n_s:
+            frac = cycle / self.n_s
+            new_eta = self.eta_min + frac * diff
+        else:  # or "when cycle < 2 * self.n_s"
+            frac = (cycle - self.n_s) / self.n_s
+            new_eta = self.eta_max - frac * diff
 
         return new_eta
 
@@ -389,4 +401,16 @@ class TwoLayerNetwork:
         plt.title(title)
         plt.xticks([])
         plt.yticks([])
+        plt.show()
+
+    def plot_eta_history(self):
+        """
+        Plot the history of the error
+        """
+        x_axis = range(1, len(self.eta_history) + 1)
+        y_axis_eta = self.eta_history
+        plt.plot(x_axis, y_axis_eta, alpha=0.7, label="History of learning rate")
+        plt.legend(loc='upper right')
+        plt.xlabel('epochs')
+        plt.ylabel('eta values')
         plt.show()

@@ -16,8 +16,8 @@ class MultiLayerNetwork:
         """
 
         var_defaults = {
-            "eta_min": 0.001,  # min learning rate for cycle
-            "eta_max": 0.1,  # max learning rate for cycle
+            "eta_min": 1e-5,  # min learning rate for cycle
+            "eta_max": 1e-1,  # max learning rate for cycle
             "n_s": 500,  # parameter variable for cyclical learning rate
             "n_batch": 100,  # size of data batches within an epoch
             "lambda_reg": .1,  # regularizing term variable
@@ -39,6 +39,7 @@ class MultiLayerNetwork:
         self.prev_val_error = 0
         self.loss_train_av_history = []
         self.loss_val_av_history = []
+        self.eta_history = []
 
     def init_weights(self, net_structure, d):
         """
@@ -75,6 +76,7 @@ class MultiLayerNetwork:
         batch_epochs = int(n / self.n_batch)
 
         self.loss_train_av_history = []
+        self.eta_history = []
 
         iteration = 0
 
@@ -90,10 +92,9 @@ class MultiLayerNetwork:
 
             for batch in range(batch_epochs):
                 # Calculate a new learning rate based on the CLR method
-                #cycle = 1  # One cycle should correspond to around 10 epochs
-                #self.eta = self.cycle_eta(iteration, cycle)
-                #iteration += 1
-                #print(self.eta)
+                self.eta = self.cycle_eta(iteration)
+                self.eta_history.append(self.eta)
+                iteration += 1
 
                 start = batch * self.n_batch
                 end = start + self.n_batch
@@ -117,6 +118,13 @@ class MultiLayerNetwork:
 
                 av_acc += self.accuracy(class_out, batch_classes)
 
+                if ensemble:
+                    # If the cycle has ended, the learning rate will be at its lowest
+                    # meaning it the model has reached a local minima
+                    if self.eta == self.eta_min:
+                        # Save weights & bias of the ith cycle
+                        self.models[i] = [self.w.copy(), self.b.copy()]
+
             average_epoch_loss = av_loss / batch_epochs
             average_epoch_acc = av_acc / batch_epochs
             self.loss_train_av_history.append(average_epoch_loss)
@@ -124,10 +132,7 @@ class MultiLayerNetwork:
             if verbose:
                 print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
 
-            if ensemble:
-                if True:  # If the cycle has ended, meaning it the model has reached a local minima TODO: fix condition
-                    self.models[i] = [self.w.copy(), self.b.copy()]  # Save weights & bias of the ith cycle  TODO: fix index
-            else:
+            if not ensemble:
                 self.models[0] = [self.w, self.b]  # if ensemble was disabled, just save the last model
 
             val_loss, val_acc = self.test(val_data, val_labels)
@@ -310,7 +315,7 @@ class MultiLayerNetwork:
     def reg(self):
         """
         Compute the regularization term, in this case L2: lambda * ||W||^2
-        using the weights of the OUTPUT layer
+        using the weights of ALL the layers
         """
         weight_sum = 0
         for w in self.w:
@@ -325,17 +330,19 @@ class MultiLayerNetwork:
         """
         return batch + np.random.normal(self.noise_m, self.noise_std, batch.shape)
 
-    def cycle_eta(self, iteration, cycle):
+    def cycle_eta(self, iteration):
         """
         Calculate the learning rate for a specific cycle
         """
+        cycle = iteration % (self.n_s * 2)
         diff = self.eta_max - self.eta_min
 
-        part1 = iteration / self.n_s
-        part2 = (2 * cycle) + 1
-        x = np.abs(part1 - part2)
-
-        new_eta = self.eta_min + diff * np.maximum(0, (1 - x))
+        if cycle < self.n_s:
+            frac = cycle / self.n_s
+            new_eta = self.eta_min + frac * diff
+        else:  # or "when cycle < 2 * self.n_s"
+            frac = (cycle - self.n_s) / self.n_s
+            new_eta = self.eta_max - frac * diff
 
         return new_eta
 
