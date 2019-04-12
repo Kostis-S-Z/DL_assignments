@@ -58,9 +58,9 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     net = MultiLayerNetwork(**model_parameters)
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
-              n_epochs=40, early_stop=False, ensemble=True, verbose=True)
+              n_epochs=5, early_stop=False, ensemble=False, verbose=True)
 
-    # net.plot_loss()  # Plot the loss progress
+    net.plot_loss()  # Plot the loss progress
 
     test_loss, test_accuracy = net.test(test_x, test_y)
 
