@@ -14,11 +14,10 @@ directory = parent_dir + "/cifar-10-batches-py"  # The dataset should be in the 
 
 
 model_parameters = {
-    "eta_min": 0.001,  # min learning rate for cycle
-    "eta_max": 0.1,  # max learning rate for cycle
+    "eta_min": 1e-5,  # min learning rate for cycle
+    "eta_max": 1e-1,  # max learning rate for cycle
     "n_s": 500,  # parameter variable for cyclical learning rate
     "n_batch": 200,  # size of data batches within an epoch
-    "n_nodes": 50,  # number of nodes (neurons) in the hidden layer
     "train_noisy": False,  # variable to toggle adding noise to the training data
     "noise_m": 0,  # the mean of the gaussian noise added to the training data
     "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
