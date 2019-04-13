@@ -65,7 +65,7 @@ class TwoLayerNetwork:
             self.b.append(np.array(hidden_bias))
 
     def train(self, network_structure, data, labels, val_data, val_labels,
-              n_epochs=100, early_stop=True, ensemble=False, verbose=False):
+              n_epochs=100, early_stop=False, ensemble=False, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
@@ -80,6 +80,7 @@ class TwoLayerNetwork:
         self.eta_history = []
 
         iteration = 0
+        cycle = 0
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
@@ -122,6 +123,7 @@ class TwoLayerNetwork:
                     # If the cycle has ended, the learning rate will be at its lowest
                     # meaning it the model has reached a local minima
                     if self.eta == self.eta_min:
+                        cycle += 1
                         # Save weights & bias of the ith cycle
                         self.models[i] = [self.w.copy(), self.b.copy()]
 
@@ -410,9 +412,8 @@ class TwoLayerNetwork:
         """
         x_axis = range(1, len(self.eta_history) + 1)
         y_axis_eta = self.eta_history
-        plt.plot(x_axis, y_axis_eta, alpha=0.7, label="History of learning rate")
-        plt.legend(loc='upper right')
-        plt.xlabel('epochs')
+        plt.plot(x_axis, y_axis_eta, alpha=0.7)
+        plt.xlabel('update steps')
         plt.ylabel('eta values')
         plt.show()
 

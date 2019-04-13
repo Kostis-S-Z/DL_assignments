@@ -5,6 +5,7 @@ Created by Kostis S-Z @ 2019-03-27
 """
 
 import numpy as np
+import json
 from pathlib import Path
 from network2 import TwoLayerNetwork
 from data import load_data, preprocess_data, process_zero_mean
@@ -50,7 +51,7 @@ def main():
 
     # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
-    # best_lambda = lambda_search(train_x, train_y, val_x, val_y)
+    best_lambda = lambda_search(train_x, train_y, val_x, val_y)
 
 
 def test_grad_computations(train_x, train_y):
@@ -79,7 +80,7 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     net = TwoLayerNetwork(**model_parameters)
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
-              n_epochs=40, early_stop=False, ensemble=True, verbose=True)
+              n_epochs=30, early_stop=False, ensemble=True, verbose=True)
 
     net.plot_loss()  # Plot the loss progress
     net.plot_eta_history()
@@ -94,25 +95,39 @@ def lambda_search(train_x, train_y, val_x, val_y):
     Search for the optimal lambda
     """
 
-    lambda_reg_coarse = [0.001, 0.01, 0.05, 0.1]
-    lambda_reg_medium = np.arange(0.0001, 0.2, 0.05)
-    lambda_reg_fine = np.arange(0.0001, 0.2, 0.005)
+    # Coarse search
+    l_min = -5
+    l_max = -1
+    n_lambda = 5
+    # Fine search
+    l_min_f = -3
+    l_max_f = -2
+    n_lambda_f = 20
 
-    lambda_reg_s = lambda_reg_coarse
+    lambda_reg_c = []
+    for _ in range(n_lambda):
+        l_i = l_min + (l_max - l_min) * np.random.rand()
+        lambda_reg_c.append(10 ** l_i)
+
+    lambda_reg_f = []
+    for _ in range(n_lambda):
+        l_i = l_min + (l_max - l_min) * np.random.rand()
+        lambda_reg_f.append(10 ** l_i)
 
     results = {}
     optimal_lambda = 0
     best_model_accuracy = 0.
 
-    epochs = 50
-    model_parameters["n_s"] = 2 * int(epochs / model_parameters["n_batch"])
+    epochs = 12
+    model_parameters["n_s"] = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
 
-    for lambda_reg in lambda_reg_s:
+    for lambda_reg in lambda_reg_c:
         model_parameters["lambda_reg"] = lambda_reg
 
         net = TwoLayerNetwork(**model_parameters)
 
-        val_accuracy = net.train(train_x, train_y, val_x, val_y, n_epochs=epochs, early_stop=False, verbose=False)
+        val_accuracy = net.train(network_structure, train_x, train_y, val_x, val_y,
+                                 n_epochs=epochs, early_stop=False, verbose=True)
 
         val_acc = round(val_accuracy * 100, 1)
         print("Lambda: {} | Test accuracy: {}".format(lambda_reg, val_acc))
@@ -124,6 +139,10 @@ def lambda_search(train_x, train_y, val_x, val_y):
             optimal_lambda = lambda_reg
 
     print("Optimal lambda: {} with test accuracy: {}".format(optimal_lambda, best_model_accuracy))
+
+    with open('lambda_results.json', 'w') as fp:
+        json.dump(results, fp, sort_keys=True, indent=2)
+
     return optimal_lambda
 
 
