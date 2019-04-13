@@ -18,7 +18,7 @@ model_parameters = {
     "eta_max": 1e-1,  # max learning rate for cycle
     "n_s": 500,  # parameter variable for cyclical learning rate
     "n_batch": 100,  # size of data batches within an epoch
-    "train_noisy": True,  # variable to toggle adding noise to the training data
+    "train_noisy": False,  # variable to toggle adding noise to the training data
     "noise_m": 0,  # the mean of the gaussian noise added to the training data
     "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
     "lambda_reg": 0.,  # regularizing term variable
@@ -46,9 +46,30 @@ def main():
     # Process the data so they have a zero mean
     train_x, val_x, test_x = process_zero_mean(train_x, val_x, test_x)
 
-    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    # test_grad_computations(train_x, train_y)
+
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
     # best_lambda = lambda_search(train_x, train_y, val_x, val_y)
+
+
+def test_grad_computations(train_x, train_y):
+    """
+    Run one epoch and test if gradients are computed correctly
+    """
+    num_samples = 1
+    num_features = 20
+
+    train_x = train_x[:num_samples, :num_features]
+    train_y = train_y[:num_samples]
+
+    model_parameters["n_batch"] = num_samples  # size of data batches within an epoch
+    model_parameters["eta"] = 0.01  # size of data batches within an epoch
+    model_parameters["lambda_reg"] = 0.0  # size of data batches within an epoch
+
+    net = TwoLayerNetwork(**model_parameters)
+
+    net.compare_grads(network_structure, train_x, train_y)
 
 
 def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):

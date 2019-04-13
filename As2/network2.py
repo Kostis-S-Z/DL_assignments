@@ -3,6 +3,7 @@ Created by Kostis S-Z @ 2019-04-03
 """
 
 
+import copy
 import numpy as np
 from scipy.stats import mode
 from matplotlib import pyplot as plt
@@ -414,3 +415,109 @@ class TwoLayerNetwork:
         plt.xlabel('epochs')
         plt.ylabel('eta values')
         plt.show()
+
+    def compare_grads(self, network_structure, data, labels):
+        """
+        Compare the results of the analytical and the numerical calculations of the gradiens
+        """
+
+        d = data.shape[1]  # number of features
+
+        data = data.T
+        labels = labels.T
+
+        self.init_weights(network_structure, d)
+
+        init_w = copy.deepcopy(self.w)
+        init_b = copy.deepcopy(self.b)
+
+        # Calculate numerically
+        grad_w_num, grad_b_num = self.compute_grads_num(data, labels)
+
+        # Reset weights and bias to start from the same position
+        self.w = init_w
+        self.b = init_b
+
+        # Calculate analytically
+        l_out, _ = self.forward(data)
+        _ = self.backward(l_out, data, labels)
+
+        grad_w_ana, grad_b_ana = self.w, self.b
+
+        # Compare results
+        print(grad_w_ana[0].shape)
+        print(grad_w_num[0].shape)
+
+        print(grad_w_ana[1].shape)
+        print(grad_w_num[1].shape)
+
+    def compute_grads_num(self, data, targets):
+        """
+        Compute the gradients numerically to check if the analytic solution is correct
+        """
+
+        h = 1e-5
+
+        grad_w = []
+        grad_b = []
+
+        for j in range(len(self.b)):
+
+            grad_b_j = np.zeros(len(self.b[j]))
+            for i in range(len(self.b[j])):
+                # b_try = self.b
+                # b_try[j][i] = b_try[j][i] - h
+                self.b[j][i] = self.b[j][i] - h
+
+                layers_out, _ = self.forward(data)
+
+                new_p_out = layers_out[-1]
+
+                c1, _ = self.cross_entropy_loss(new_p_out, targets)
+
+                c1 += self.reg()
+
+                # b_try = self.b
+                # b_try[j][i] = b_try[j][i] + h
+                self.b[j][i] = self.b[j][i] - h
+
+                layers_out, _ = self.forward(data)
+
+                new_p_out = layers_out[-1]
+
+                c2, _ = self.cross_entropy_loss(new_p_out, targets)
+
+                grad_b_j[i] = (c2 - c1) / (2 * h)
+
+            grad_b.append(grad_b_j)
+
+        for k in range(len(self.w)):
+
+            grad_w_k = np.zeros(self.w[k].shape)
+
+            for j in range(grad_w_k.shape[0]):
+
+                for i in range(grad_w_k.shape[1]):
+                    self.w[k][j][i] = self.w[k][j][i] - h
+
+                    layers_out, _ = self.forward(data)
+
+                    new_p_out = layers_out[-1]
+
+                    c1, _ = self.cross_entropy_loss(new_p_out, targets)
+
+                    c1 += self.reg()
+
+                    self.w[k][j][i] = self.w[k][j][i] + h
+
+                    layers_out, _ = self.forward(data)
+
+                    new_p_out = layers_out[-1]
+
+                    c2, _ = self.cross_entropy_loss(new_p_out, targets)
+
+                    grad_w_k[j][i] = (c2 - c1) / (2 * h)
+
+            grad_w.append(grad_w_k)
+
+        return grad_w, grad_b
