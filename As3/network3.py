@@ -21,6 +21,8 @@ class MultiLayerNetwork:
             "n_s": 500,  # parameter variable for cyclical learning rate
             "n_batch": 100,  # size of data batches within an epoch
             "lambda_reg": .1,  # regularizing term variable
+            "dropout": False,  # Use dropout or not
+            "dropout_perc": 0.2,  # Percentage of nodes to dropout
             "train_noisy": False,  # variable to toggle adding noise to the training data
             "noise_m": 0,  # the mean of the gaussian noise added to the training data
             "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
@@ -79,13 +81,14 @@ class MultiLayerNetwork:
         self.eta_history = []
 
         iteration = 0
+        cycle = 0
 
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
-            np.random.shuffle(indices)  # shuffle the indices and then the data and labels based on this
-            data = data[indices]  # current form of data: samples x features
-            labels = labels[indices]
+            #np.random.shuffle(indices)  # shuffle the indices and then the data and labels based on this
+            #data = data[indices]  # current form of data: samples x features
+            #labels = labels[indices]
 
             av_acc = 0  # Average epoch accuracy
             av_loss = 0  # Average epoch loss
@@ -122,6 +125,7 @@ class MultiLayerNetwork:
                     # If the cycle has ended, the learning rate will be at its lowest
                     # meaning it the model has reached a local minima
                     if self.eta == self.eta_min:
+                        cycle += 1
                         # Save weights & bias of the ith cycle
                         self.models[i] = [self.w.copy(), self.b.copy()]
 
@@ -188,7 +192,7 @@ class MultiLayerNetwork:
         results = []
         for i, model_results in models_out.items():
             results.append(model_results)
-            print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
+            # print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
 
         # Take majority vote across models
         average_out = mode(results, axis=0)[0]
@@ -403,4 +407,15 @@ class MultiLayerNetwork:
         plt.title(title)
         plt.xticks([])
         plt.yticks([])
+        plt.show()
+
+    def plot_eta_history(self):
+        """
+        Plot the history of the error
+        """
+        x_axis = range(1, len(self.eta_history) + 1)
+        y_axis_eta = self.eta_history
+        plt.plot(x_axis, y_axis_eta, alpha=0.7)
+        plt.xlabel('update steps')
+        plt.ylabel('eta values')
         plt.show()
