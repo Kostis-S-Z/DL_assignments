@@ -21,6 +21,7 @@ class MultiLayerNetwork:
             "n_s": 500,  # parameter variable for cyclical learning rate
             "n_batch": 100,  # size of data batches within an epoch
             "lambda_reg": .1,  # regularizing term variable
+            "init_type": "Xavier",  # Choose between Xavier and He initialisation
             "dropout": False,  # Use dropout or not
             "dropout_perc": 0.2,  # Percentage of nodes to dropout
             "train_noisy": False,  # variable to toggle adding noise to the training data
@@ -48,12 +49,16 @@ class MultiLayerNetwork:
         Initialize a weight matrix for the hidden and the output layers
         """
         mean = 0
+        if self.init_type == "Xavier":
+            numer = 1
+        else:  # use He initialisation
+            numer = 2
 
         dim_prev_layer = d
         # For every layer (including the output)
         for l in range(len(net_structure)):
             # Calculate standard deviation to initialise the weights of layer i
-            std = 1 / np.sqrt(dim_prev_layer)
+            std = numer / np.sqrt(dim_prev_layer)
             # Initialize weight matrix of layer i
             w_layer_i = np.random.normal(mean, std, (net_structure[l], dim_prev_layer))
             # Initialize bias column vector of layer i

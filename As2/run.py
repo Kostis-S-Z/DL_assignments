@@ -44,6 +44,7 @@ def main():
     val_x, val_y = preprocess_data(val_x, val_y)
     test_x, test_y = preprocess_data(test_x, test_y)
 
+    # TODO: Maybe dont divide with 255 AND with std
     # Process the data so they have a zero mean
     mean, std = np.mean(train_x), np.std(train_x)  # Find mean and std of training data
     train_x = process_zero_mean(train_x, mean, std)

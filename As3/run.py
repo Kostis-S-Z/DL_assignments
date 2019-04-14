@@ -19,6 +19,7 @@ model_parameters = {
     "eta_max": 1e-1,  # max learning rate for cycle
     "n_s": 500,  # parameter variable for cyclical learning rate
     "n_batch": 100,  # size of data batches within an epoch
+    "init_type": "Xavier",  # Choose between Xavier and He initialisation
     "dropout": False,  # Use dropout or not
     "dropout_perc": 0.2,  # Percentage of nodes to dropout
     "train_noisy": False,  # variable to toggle adding noise to the training data
@@ -49,6 +50,7 @@ def main():
     val_x, val_y = preprocess_data(val_x, val_y)
     test_x, test_y = preprocess_data(test_x, test_y)
 
+    # TODO: Maybe dont divide with 255 AND with std
     # Process the data so they have a zero mean
     mean, std = np.mean(train_x), np.std(train_x)  # Find mean and std of training data
     train_x = process_zero_mean(train_x, mean, std)
