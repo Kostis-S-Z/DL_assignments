@@ -91,14 +91,10 @@ def preprocess_data(data, labels):
     return data, labels
 
 
-def process_zero_mean(train, val, test):
+def process_zero_mean(data, mean, std):
     """
     Preprocess data to have a zero mean based on the mean of the training data
     :return: the processed data
     """
-    mean = np.mean(train)
-    std = np.std(train)
-    train_t = (train - mean) / std
-    val_t = (val - mean) / std
-    test_t = (test - mean) / std
-    return train_t, val_t, test_t
+    data = (data - mean) / std
+    return data

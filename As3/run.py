@@ -5,6 +5,7 @@ Created by Kostis S-Z @ 2019-03-27
 """
 
 
+import numpy as np
 from pathlib import Path
 from network3 import MultiLayerNetwork
 from data import load_data, preprocess_data, process_zero_mean
@@ -49,7 +50,10 @@ def main():
     test_x, test_y = preprocess_data(test_x, test_y)
 
     # Process the data so they have a zero mean
-    train_x, val_x, test_x = process_zero_mean(train_x, val_x, test_x)
+    mean, std = np.mean(train_x), np.std(train_x)  # Find mean and std of training data
+    train_x = process_zero_mean(train_x, mean, std)
+    val_x = process_zero_mean(val_x, mean, std)
+    test_x = process_zero_mean(test_x, mean, std)
 
     train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 

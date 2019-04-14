@@ -45,21 +45,26 @@ def main():
     test_x, test_y = preprocess_data(test_x, test_y)
 
     # Process the data so they have a zero mean
-    train_x, val_x, test_x = process_zero_mean(train_x, val_x, test_x)
+    mean, std = np.mean(train_x), np.std(train_x)  # Find mean and std of training data
+    train_x = process_zero_mean(train_x, mean, std)
+    val_x = process_zero_mean(val_x, mean, std)
+    test_x = process_zero_mean(test_x, mean, std)
 
     # test_grad_computations(train_x, train_y)
 
-    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    # overfit_test(train_x, train_y)
 
-    best_lambda = lambda_search(train_x, train_y, val_x, val_y)
+    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+
+    # best_lambda = lambda_search(train_x, train_y, val_x, val_y)
 
 
 def test_grad_computations(train_x, train_y):
     """
     Run one epoch and test if gradients are computed correctly
     """
-    num_samples = 1
-    num_features = 20
+    num_samples = 2
+    num_features = 30
 
     train_x = train_x[:num_samples, :num_features]
     train_y = train_y[:num_samples]
@@ -73,16 +78,42 @@ def test_grad_computations(train_x, train_y):
     net.compare_grads(network_structure, train_x, train_y)
 
 
+def overfit_test(train_x, train_y):
+    """
+    Train a model a bit too much, making it overfit to the training data
+    """
+    num_samples = 100
+    train_x = train_x[:num_samples, :]
+    train_y = train_y[:num_samples]
+
+    net = TwoLayerNetwork(**model_parameters)
+
+    net.train(network_structure, train_x, train_y, train_x, train_y,
+              n_epochs=200, early_stop=False, ensemble=False, verbose=True)
+
+    net.plot_loss()  # Plot the loss progress
+    net.plot_accuracy()
+    test_loss, test_accuracy = net.test(train_x, train_y)
+
+    print("Test accuracy: ", test_accuracy)
+
+
 def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     Train and test a two-layer network
     """
+    epochs = 10
+    model_parameters["lambda_reg"] = 0.01
+    model_parameters["n_s"] = 500  # one cycle
+    # model_parameters["n_s"] = 800  # three cycles
+
     net = TwoLayerNetwork(**model_parameters)
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
-              n_epochs=30, early_stop=False, ensemble=True, verbose=True)
+              n_epochs=epochs, early_stop=False, ensemble=True, verbose=True)
 
     net.plot_loss()  # Plot the loss progress
+    net.plot_accuracy()
     net.plot_eta_history()
 
     test_loss, test_accuracy = net.test(test_x, test_y)
