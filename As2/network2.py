@@ -39,6 +39,7 @@ class TwoLayerNetwork:
         self.eta = 0.01
         self.prev_val_error = 0
         self.loss_train_av_history = []
+        self.acc_train_av_history = []
         self.loss_val_av_history = []
         self.eta_history = []
 
@@ -77,6 +78,7 @@ class TwoLayerNetwork:
         batch_epochs = int(n / self.n_batch)
 
         self.loss_train_av_history = []
+        self.acc_train_av_history = []
         self.eta_history = []
 
         iteration = 0
@@ -130,6 +132,7 @@ class TwoLayerNetwork:
             average_epoch_loss = av_loss / batch_epochs
             average_epoch_acc = av_acc / batch_epochs
             self.loss_train_av_history.append(average_epoch_loss)
+            self.acc_train_av_history.append(average_epoch_acc)
 
             if verbose:
                 print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
@@ -386,8 +389,19 @@ class TwoLayerNetwork:
         plt.plot(x_axis, y_axis_train, alpha=0.7, label="Train loss")
         plt.plot(x_axis, y_axis_val, alpha=0.7, label="Validation loss")
         plt.legend(loc='upper right')
-        plt.xlabel('epochs')
-        plt.ylabel('loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.show()
+
+    def plot_accuracy(self):
+        """
+        Plot the history of the accuracy
+        """
+        x_axis = range(1, len(self.acc_train_av_history) + 1)
+        y_axis_train = self.acc_train_av_history
+        plt.plot(x_axis, y_axis_train, alpha=0.7)
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy')
         plt.show()
 
     def plot_image(self, image, title=""):
@@ -449,8 +463,8 @@ class TwoLayerNetwork:
         print(grad_w_ana[0].shape)
         print(grad_w_num[0].shape)
 
-        print(grad_w_ana[1].shape)
-        print(grad_w_num[1].shape)
+        print(grad_w_ana[1][0])
+        print(grad_w_num[1][0])
 
     def compute_grads_num(self, data, targets):
         """
