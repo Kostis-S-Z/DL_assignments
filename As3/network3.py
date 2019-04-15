@@ -246,8 +246,8 @@ class MultiLayerNetwork:
         # Add the L2 Regularization term (lambda * ||W||^2) to the loss
         loss = loss + self.reg()
 
-        # Copy the loss gradient of the output layer to use it for the update
-        loss_i_grad = loss_out_grad.copy()
+        # Set the loss gradient of the output layer to use it for the update
+        loss_i_grad = loss_out_grad
         # Initialize list to save the gradients
         weights_grads = [None] * len(l_out)
         bias_grads = [None] * len(l_out)
