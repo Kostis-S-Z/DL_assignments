@@ -84,7 +84,9 @@ def backward(self, l_out, unfilt_out, bn_out, means, vars, betas, gammas, data, 
         beta_i_grad = np.dot(loss_i_grad, np.ones((self.n_batch, 1))) / self.n_batch
 
         gammas_grads[layer_i] = gamma_i_grad
+        gammas[layer_i] = gamma_i_grad
         betas_grads[layer_i] = beta_i_grad
+        betas[layer_i] = beta_i_grad
 
         g_out = np.dot(gammas[layer_i], np.ones((self.n_batch, 1)).T)
         loss_i_grad = loss_i_grad * g_out
