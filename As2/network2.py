@@ -116,7 +116,7 @@ class TwoLayerNetwork:
                 layers_out, class_out = self.forward(batch_data)
 
                 # Run a backward pass in the network, computing the loss and updating the weights
-                loss = self.backward(layers_out, batch_data, batch_labels)
+                loss, _, _ = self.backward(layers_out, batch_data, batch_labels)
                 av_loss += loss
 
                 av_acc += self.accuracy(class_out, batch_classes)
@@ -253,8 +253,8 @@ class TwoLayerNetwork:
         for layer_i in range(len(l_out)-1, 0, -1):
             # Calculate layer weight gradient based on the loss of that layer and the input of that layer
             w_i_grad = np.dot(loss_i_grad, l_out[layer_i-1].T) / self.n_batch
-            # Calculate layer bias gradient based on its loss
-            b_i_grad = np.sum(loss_i_grad, axis=0) / self.n_batch
+            # Calculate layer bias gradient based on its loss (maybe np.sum(loss_i_grad, axis=0) also works)
+            b_i_grad = np.dot(loss_i_grad, np.ones((self.n_batch, 1))) / self.n_batch
             # Compute gradient of regularization term w.r.t the OUTPUT weights
             reg_i_grad = 2 * self.lambda_reg * self.w[layer_i]
             # Save the gradients
@@ -269,7 +269,7 @@ class TwoLayerNetwork:
         # Calculate FIRST hidden layer weight and bias gradients
         w_0_grad = np.dot(loss_i_grad, data.T) / self.n_batch
         # Calculate layer bias gradient based on its loss
-        b_0_grad = np.sum(loss_i_grad, axis=0) / self.n_batch
+        b_0_grad = np.dot(loss_i_grad, np.ones((self.n_batch, 1))) / self.n_batch
         # Compute gradient of regularization term
         reg_0_grad = 2 * self.lambda_reg * self.w[0]
         # Save the gradients
@@ -281,7 +281,7 @@ class TwoLayerNetwork:
             self.w[i] = self.w[i] - self.eta * weights_grads[i]
             self.b[i] = self.b[i] - self.eta * bias_grads[i]
 
-        return loss
+        return loss, weights_grads, bias_grads
 
     def softmax(self, out):
         """
@@ -433,7 +433,7 @@ class TwoLayerNetwork:
 
     def compare_grads(self, network_structure, data, labels):
         """
-        Compare the results of the analytical and the numerical calculations of the gradiens
+        Compare the results of the analytical and the numerical (centered difference) calculations of the gradients
         """
 
         d = data.shape[1]  # number of features
@@ -450,21 +450,30 @@ class TwoLayerNetwork:
         grad_w_num, grad_b_num = self.compute_grads_num(data, labels)
 
         # Reset weights and bias to start from the same position
-        self.w = init_w
-        self.b = init_b
+        self.w = copy.deepcopy(init_w)
+        self.b = copy.deepcopy(init_b)
 
         # Calculate analytically
         l_out, _ = self.forward(data)
-        _ = self.backward(l_out, data, labels)
+        _, grad_w_ana, grad_b_ana = self.backward(l_out, data, labels)
 
-        grad_w_ana, grad_b_ana = self.w, self.b
+        print("Random samples of hidden layer of neuron 1")
+        print(grad_w_num[0][0][:5])
+        print(grad_w_ana[0][0][:5])
 
-        # Compare results
-        print(grad_w_ana[0].shape)
-        print(grad_w_num[0].shape)
+        print("Random samples of hidden layer of neuron 20")
+        print(grad_w_num[0][19][10:15])
+        print(grad_w_ana[0][19][10:15])
 
-        print(grad_w_ana[1][0])
-        print(grad_w_num[1][0])
+        print("Random samples of output layer of neuron 1")
+        print(grad_w_num[1][0][:5])
+        print(grad_w_ana[1][0][:5])
+
+        print("Average error differences between the numerical and the analytical computation of gradients: ")
+        print("Hidden layer weights:", np.mean(np.abs(grad_w_ana[0]) - np.abs(grad_w_num[0])))
+        print("Output layer weights:", np.mean(np.abs(grad_w_ana[1]) - np.abs(grad_w_num[1])))
+        print("Hidden layer bias:", np.mean(np.abs(grad_b_ana[0]) - np.abs(grad_b_num[0])))
+        print("Output layer bias:", np.mean(np.abs(grad_b_ana[1]) - np.abs(grad_b_num[1])))
 
     def compute_grads_num(self, data, targets):
         """
@@ -480,28 +489,19 @@ class TwoLayerNetwork:
 
             grad_b_j = np.zeros(len(self.b[j]))
             for i in range(len(self.b[j])):
-                # b_try = self.b
-                # b_try[j][i] = b_try[j][i] - h
+
                 self.b[j][i] = self.b[j][i] - h
 
                 layers_out, _ = self.forward(data)
-
-                new_p_out = layers_out[-1]
-
-                c1, _ = self.cross_entropy_loss(new_p_out, targets)
-
+                c1, _ = self.cross_entropy_loss(layers_out[-1], targets)
                 c1 += self.reg()
 
-                # b_try = self.b
-                # b_try[j][i] = b_try[j][i] + h
-                self.b[j][i] = self.b[j][i] - h
-
+                self.b[j][i] = self.b[j][i] + 2*h
                 layers_out, _ = self.forward(data)
+                c2, _ = self.cross_entropy_loss(layers_out[-1], targets)
+                c2 += self.reg()
 
-                new_p_out = layers_out[-1]
-
-                c2, _ = self.cross_entropy_loss(new_p_out, targets)
-
+                self.b[j][i] = self.b[j][i] - h
                 grad_b_j[i] = (c2 - c1) / (2 * h)
 
             grad_b.append(grad_b_j)
@@ -516,21 +516,16 @@ class TwoLayerNetwork:
                     self.w[k][j][i] = self.w[k][j][i] - h
 
                     layers_out, _ = self.forward(data)
-
-                    new_p_out = layers_out[-1]
-
-                    c1, _ = self.cross_entropy_loss(new_p_out, targets)
-
+                    c1, _ = self.cross_entropy_loss(layers_out[-1], targets)
                     c1 += self.reg()
 
-                    self.w[k][j][i] = self.w[k][j][i] + h
+                    self.w[k][j][i] = self.w[k][j][i] + 2*h
 
                     layers_out, _ = self.forward(data)
+                    c2, _ = self.cross_entropy_loss(layers_out[-1], targets)
+                    c2 += self.reg()
 
-                    new_p_out = layers_out[-1]
-
-                    c2, _ = self.cross_entropy_loss(new_p_out, targets)
-
+                    self.w[k][j][i] = self.w[k][j][i] - h
                     grad_w_k[j][i] = (c2 - c1) / (2 * h)
 
             grad_w.append(grad_w_k)
