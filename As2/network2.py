@@ -39,8 +39,11 @@ class TwoLayerNetwork:
         self.eta = 0.01
         self.prev_val_error = 0
         self.loss_train_av_history = []
+        self.cost_train_av_history = []
         self.acc_train_av_history = []
         self.loss_val_av_history = []
+        self.cost_val_av_history = []
+        self.acc_val_av_history = []
         self.eta_history = []
 
     def init_weights(self, net_structure, d):
@@ -78,11 +81,11 @@ class TwoLayerNetwork:
         batch_epochs = int(n / self.n_batch)
 
         self.loss_train_av_history = []
+        self.cost_train_av_history = []
         self.acc_train_av_history = []
         self.eta_history = []
 
         iteration = 0
-        cycle = 0
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
@@ -92,6 +95,7 @@ class TwoLayerNetwork:
 
             av_acc = 0  # Average epoch accuracy
             av_loss = 0  # Average epoch loss
+            av_cost = 0  # Average epoch cost
 
             for batch in range(batch_epochs):
                 # Calculate a new learning rate based on the CLR method
@@ -116,8 +120,9 @@ class TwoLayerNetwork:
                 layers_out, class_out = self.forward(batch_data)
 
                 # Run a backward pass in the network, computing the loss and updating the weights
-                loss, _, _ = self.backward(layers_out, batch_data, batch_labels)
+                loss, cost, _, _ = self.backward(layers_out, batch_data, batch_labels)
                 av_loss += loss
+                av_cost += cost
 
                 av_acc += self.accuracy(class_out, batch_classes)
 
@@ -125,13 +130,14 @@ class TwoLayerNetwork:
                     # If the cycle has ended, the learning rate will be at its lowest
                     # meaning it the model has reached a local minima
                     if self.eta == self.eta_min:
-                        cycle += 1
                         # Save weights & bias of the ith cycle
                         self.models[i] = [self.w.copy(), self.b.copy()]
 
             average_epoch_loss = av_loss / batch_epochs
+            average_epoch_cost = av_cost / batch_epochs
             average_epoch_acc = av_acc / batch_epochs
             self.loss_train_av_history.append(average_epoch_loss)
+            self.cost_train_av_history.append(average_epoch_cost)
             self.acc_train_av_history.append(average_epoch_acc)
 
             if verbose:
@@ -140,9 +146,11 @@ class TwoLayerNetwork:
             if not ensemble:
                 self.models[0] = [self.w, self.b]  # if ensemble was disabled, just save the last model
 
-            val_loss, val_acc = self.test(val_data, val_labels)
+            val_loss, val_cost, val_acc = self.test(val_data, val_labels)
 
             self.loss_val_av_history.append(val_loss)
+            self.cost_val_av_history.append(val_cost)
+            self.acc_val_av_history.append(val_acc)
 
             if early_stop:
                 val_error = 1 - val_acc
@@ -161,6 +169,7 @@ class TwoLayerNetwork:
         models_out = {}
         models_accuracy = {}
         models_loss = {}
+        models_cost = {}
 
         test_labels = np.argmax(test_targets, axis=1)  # Convert one-hot to integer
 
@@ -173,6 +182,7 @@ class TwoLayerNetwork:
             model_out = np.zeros(test_labels.shape)
 
             test_average_loss_i = 0  # Initialize average loss of model i
+            test_average_cost_i = 0  # Initialize average cost of model i
 
             for batch in range(batch_epochs):
                 start = batch * self.n_batch
@@ -186,8 +196,10 @@ class TwoLayerNetwork:
 
                 loss, _ = self.cross_entropy_loss(layers_out[-1], batch_labels)
                 test_average_loss_i += loss
+                test_average_cost_i += loss + self.reg()
 
             models_loss[i] = test_average_loss_i / batch_epochs
+            models_cost[i] = test_average_cost_i / batch_epochs
             models_accuracy[i] = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
             models_out[i] = model_out  # Save the output of the model
 
@@ -205,8 +217,10 @@ class TwoLayerNetwork:
         test_average_acc = self.accuracy(average_out, test_labels)
         # Average loss over all models
         test_average_loss = np.sum(list(models_loss.values())) / len(models_loss)
+        # Average cost over all models
+        test_average_cost = np.sum(list(models_cost.values())) / len(models_cost)
 
-        return test_average_loss, test_average_acc
+        return test_average_loss, test_average_cost, test_average_acc
 
     def forward(self, data):
         """
@@ -242,7 +256,7 @@ class TwoLayerNetwork:
         loss, loss_out_grad = self.cross_entropy_loss(l_out[-1], targets)
 
         # Add the L2 Regularization term (lambda * ||W||^2) to the loss
-        loss = loss + self.reg()
+        cost = loss + self.reg()
 
         # Copy the loss gradient of the output layer to use it for the update
         loss_i_grad = loss_out_grad.copy()
@@ -281,7 +295,7 @@ class TwoLayerNetwork:
             self.w[i] = self.w[i] - self.eta * weights_grads[i]
             self.b[i] = self.b[i] - self.eta * bias_grads[i]
 
-        return loss, weights_grads, bias_grads
+        return loss, cost, weights_grads, bias_grads
 
     def softmax(self, out):
         """
@@ -379,29 +393,26 @@ class TwoLayerNetwork:
         print(' Train Error: {}'.format(train_error))
         print(' Validation Error: {}'.format(val_error))
 
-    def plot_loss(self):
+    def plot_train_val_progress(self):
         """
-        Plot the history of the error
+        Plot loss, cost, accuracy
         """
-        x_axis = range(1, len(self.loss_train_av_history) + 1)
-        y_axis_train = self.loss_train_av_history
-        y_axis_val = self.loss_val_av_history
-        plt.plot(x_axis, y_axis_train, alpha=0.7, label="Train loss")
-        plt.plot(x_axis, y_axis_val, alpha=0.7, label="Validation loss")
-        plt.legend(loc='upper right')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.show()
+        self.general_plot(self.loss_train_av_history, self.loss_val_av_history, title="Loss", xlabel="Update steps")
+        self.general_plot(self.cost_train_av_history, self.cost_val_av_history, title="Cost", xlabel="Update steps")
+        self.general_plot(self.acc_train_av_history, self.acc_val_av_history, title="Accuracy", xlabel="Update steps")
 
-    def plot_accuracy(self):
+    def general_plot(self, var_train, var_val, title=None, xlabel=None):
         """
-        Plot the history of the accuracy
+        Plot the history of a variable
         """
-        x_axis = range(1, len(self.acc_train_av_history) + 1)
-        y_axis_train = self.acc_train_av_history
-        plt.plot(x_axis, y_axis_train, alpha=0.7)
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
+        x_axis = np.arange(1, len(var_train) * self.n_batch + 1, self.n_batch)
+        y_axis_train = var_train
+        y_axis_val = var_val
+        plt.plot(x_axis, y_axis_train, color='green', alpha=0.7, label="Train " + title)
+        plt.plot(x_axis, y_axis_val, color='red', alpha=0.7, label="Validation " + title)
+        plt.legend()
+        plt.xlabel(xlabel)
+        plt.ylabel(title)
         plt.show()
 
     def plot_image(self, image, title=""):
@@ -424,11 +435,11 @@ class TwoLayerNetwork:
         """
         Plot the history of the error
         """
-        x_axis = range(1, len(self.eta_history) + 1)
+        x_axis = np.arange(1, len(self.eta_history) + 1)
         y_axis_eta = self.eta_history
         plt.plot(x_axis, y_axis_eta, alpha=0.7)
-        plt.xlabel('update steps')
-        plt.ylabel('eta values')
+        plt.xlabel('Update steps')
+        plt.ylabel('Eta values')
         plt.show()
 
     def compare_grads(self, network_structure, data, labels):
@@ -455,7 +466,7 @@ class TwoLayerNetwork:
 
         # Calculate analytically
         l_out, _ = self.forward(data)
-        _, grad_w_ana, grad_b_ana = self.backward(l_out, data, labels)
+        _, _,  grad_w_ana, grad_b_ana = self.backward(l_out, data, labels)
 
         print("Random samples of hidden layer of neuron 1")
         print(grad_w_num[0][0][:5])

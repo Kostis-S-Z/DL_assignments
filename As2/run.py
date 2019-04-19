@@ -44,7 +44,6 @@ def main():
     val_x, val_y = preprocess_data(val_x, val_y)
     test_x, test_y = preprocess_data(test_x, test_y)
 
-    # TODO: Maybe dont divide with 255 AND with std
     # Process the data so they have a zero mean
     mean, std = np.mean(train_x), np.std(train_x)  # Find mean and std of training data
     train_x = process_zero_mean(train_x, mean, std)
@@ -55,9 +54,9 @@ def main():
 
     # overfit_test(train_x, train_y)
 
-    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
-    # best_lambda = lambda_search(train_x, train_y, val_x, val_y)
+    best_lambda = lambda_search(train_x, train_y, val_x, val_y)
 
 
 def test_grad_computations(train_x, train_y):
@@ -103,21 +102,23 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     Train and test a two-layer network
     """
-    epochs = 10
+    cycles = 1
+    n_s = 500
+    num_iters = 2 * n_s * cycles
+
+    epochs = int(num_iters / model_parameters["n_batch"])
     model_parameters["lambda_reg"] = 0.01
-    model_parameters["n_s"] = 500  # one cycle
-    # model_parameters["n_s"] = 800  # three cycles
+    model_parameters["n_s"] = n_s
 
     net = TwoLayerNetwork(**model_parameters)
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
               n_epochs=epochs, early_stop=False, ensemble=True, verbose=True)
 
-    net.plot_loss()  # Plot the loss progress
-    net.plot_accuracy()
+    net.plot_train_val_progress()
     net.plot_eta_history()
 
-    test_loss, test_accuracy = net.test(test_x, test_y)
+    test_loss, test_cost, test_accuracy = net.test(test_x, test_y)
 
     print("Test accuracy: ", test_accuracy)
 
