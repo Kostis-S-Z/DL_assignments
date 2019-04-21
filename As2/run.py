@@ -50,13 +50,61 @@ def main():
     val_x = process_zero_mean(val_x, mean, std)
     test_x = process_zero_mean(test_x, mean, std)
 
+    # Testing gradients
     # test_grad_computations(train_x, train_y)
 
+    # Testing model capabilities
     # overfit_test(train_x, train_y)
 
+    # Test different model parameters
     # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
-    best_lambda = lambda_search(train_x, train_y, val_x, val_y)
+    # Find a good regularisation value
+    lambda_search(train_x, train_y, val_x, val_y)
+
+    # Train a network with optimal hyper-parameter values using almost all of the data
+    # TODO:
+    #  use_all=True, val_size=1000
+    #  cycles = 3
+    #  n_s = 1000
+    #  lambda = best lambda
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+
+    # Report the effect of adding noise to the training data
+    # TODO:
+    #  - test 4 std values without regularisation
+    #  - test 4 std values with regularisation
+    model_parameters["train_noisy"] = True
+    model_parameters["noise_std"] = 0.01
+    model_parameters["noise_std"] = 0.05
+    model_parameters["noise_std"] = 0.1
+    model_parameters["noise_std"] = 0.15
+    cycles = 3
+    n_s = 900
+    lambda_reg = 0.
+    lambda_reg = 0.01
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+
+    # Report the effect of different number of nodes
+    # TODO:
+    #  - test with 50 / 100 / 1000 / 3072 nodes without regularisation without noise
+    model_parameters["train_noisy"] = False
+    network_structure[0] = 50
+    network_structure[0] = 100
+    network_structure[0] = 1000
+    network_structure[0] = 3072
+    cycles = 3
+    n_s = 900
+    lambda_reg = 0.
+
+    # Report the effect of ensemble method
+    # TODO:
+    #  - test with the ensemble method for 5 / 10 / 15 cycles
+    #  - test without the ensemble method for 1 / 3 / 5 / 10 cycles
+
+    cycles = 10
+    n_s = 900
+    lambda_reg = 0.01  # OPTIMAL LAMBDA
 
 
 def test_grad_computations(train_x, train_y):
@@ -127,34 +175,41 @@ def lambda_search(train_x, train_y, val_x, val_y):
     """
     Search for the optimal lambda
     """
+    cycles = 2
+    n_s = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
+    num_iters = 2 * n_s * cycles
+
+    epochs = int(num_iters / model_parameters["n_batch"])
+    model_parameters["n_s"] = n_s
+
+    print("Epochs: {}, n_s: {}".format(epochs, n_s))
 
     # Coarse search
     l_min = -5
     l_max = -1
-    n_lambda = 5
+    n_lambda = 20
     # Fine search
-    l_min_f = -3
+    l_min_f = -4
     l_max_f = -2
     n_lambda_f = 20
 
-    lambda_reg_c = []
-    for _ in range(n_lambda):
-        l_i = l_min + (l_max - l_min) * np.random.rand()
-        lambda_reg_c.append(10 ** l_i)
+    fine = True
 
-    lambda_reg_f = []
+    if fine:
+        l_min = l_min_f
+        l_max = l_max_f
+        n_lambda = n_lambda_f
+
+    lambda_regs = []
     for _ in range(n_lambda):
         l_i = l_min + (l_max - l_min) * np.random.rand()
-        lambda_reg_f.append(10 ** l_i)
+        lambda_regs.append(10 ** l_i)
 
     results = {}
     optimal_lambda = 0
     best_model_accuracy = 0.
 
-    epochs = 12
-    model_parameters["n_s"] = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
-
-    for lambda_reg in lambda_reg_c:
+    for lambda_reg in lambda_regs:
         model_parameters["lambda_reg"] = lambda_reg
 
         net = TwoLayerNetwork(**model_parameters)
@@ -163,7 +218,7 @@ def lambda_search(train_x, train_y, val_x, val_y):
                                  n_epochs=epochs, early_stop=False, verbose=True)
 
         val_acc = round(val_accuracy * 100, 1)
-        print("Lambda: {} | Test accuracy: {}".format(lambda_reg, val_acc))
+        print("Lambda: {} | Validation accuracy: {}".format(lambda_reg, val_acc))
 
         results[lambda_reg] = val_accuracy
 
@@ -173,10 +228,13 @@ def lambda_search(train_x, train_y, val_x, val_y):
 
     print("Optimal lambda: {} with test accuracy: {}".format(optimal_lambda, best_model_accuracy))
 
-    with open('lambda_results.json', 'w') as fp:
-        json.dump(results, fp, sort_keys=True, indent=2)
+    if fine:
+        title = "fine"
+    else:
+        title = "coarse"
 
-    return optimal_lambda
+    with open('lambda_results_' + title + '.json', 'w') as fp:
+        json.dump(results, fp, sort_keys=True, indent=2)
 
 
 if __name__ == "__main__":
