@@ -60,15 +60,11 @@ def main():
     # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
     # Find a good regularisation value
-    lambda_search(train_x, train_y, val_x, val_y)
+    # lambda_search(train_x, train_y, val_x, val_y)
 
     # Train a network with optimal hyper-parameter values using almost all of the data
-    # TODO:
-    #  use_all=True, val_size=1000
-    #  cycles = 3
-    #  n_s = 1000
-    #  lambda = best lambda
-    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    #  use_all=True, val_size=1000 | cycles = 3 | n_s = 1000 | lambda = 0.00087
+    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
     # Report the effect of adding noise to the training data
     # TODO:
@@ -150,18 +146,18 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     """
     Train and test a two-layer network
     """
-    cycles = 1
-    n_s = 500
+    cycles = 3
+    n_s = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
     num_iters = 2 * n_s * cycles
-
+    model_parameters["n_batch"] = 100
     epochs = int(num_iters / model_parameters["n_batch"])
-    model_parameters["lambda_reg"] = 0.01
+    model_parameters["lambda_reg"] = 0.00087
     model_parameters["n_s"] = n_s
 
     net = TwoLayerNetwork(**model_parameters)
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
-              n_epochs=epochs, early_stop=False, ensemble=True, verbose=True)
+              n_epochs=epochs, early_stop=False, ensemble=False, verbose=True)
 
     net.plot_train_val_progress()
     net.plot_eta_history()

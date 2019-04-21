@@ -113,8 +113,6 @@ class TwoLayerNetwork:
 
                 if self.train_noisy:
                     batch_data = self.apply_noise(batch_data)
-                    # TODO: print an image
-                    # self.plot_image()
 
                 # Run a forward pass in the network
                 # layers_out: the output of each layer
