@@ -2,7 +2,7 @@
 Created by Kostis S-Z @ 2019-04-03
 """
 
-
+import copy
 import numpy as np
 from scipy.stats import mode
 from matplotlib import pyplot as plt
@@ -37,8 +37,8 @@ class MultiLayerNetwork:
         self.w = []
         self.b = []
         self.models = {}  # Variable to save the weights of the model at the end of each cycle to use it during ensemble
-        self.eta = 0.01
         self.p_iter = 0
+        self.eta = 0.01
         self.prev_val_error = 0
         self.loss_train_av_history = []
         self.cost_train_av_history = []
@@ -75,7 +75,7 @@ class MultiLayerNetwork:
             self.b.append(np.array(hidden_bias))
 
     def train(self, network_structure, data, labels, val_data, val_labels,
-              n_epochs=100, early_stop=True, ensemble=False, verbose=False):
+              n_epochs=100, early_stop=False, ensemble=False, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
@@ -92,14 +92,13 @@ class MultiLayerNetwork:
         self.eta_history = []
 
         iteration = 0
-        cycle = 0
 
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
-            #np.random.shuffle(indices)  # shuffle the indices and then the data and labels based on this
-            #data = data[indices]  # current form of data: samples x features
-            #labels = labels[indices]
+            # np.random.shuffle(indices)  # shuffle the indices and then the data and labels based on this
+            # data = data[indices]  # current form of data: samples x features
+            # labels = labels[indices]
 
             av_acc = 0  # Average epoch accuracy
             av_loss = 0  # Average epoch loss
@@ -128,7 +127,7 @@ class MultiLayerNetwork:
                 layers_out, class_out = self.forward(batch_data)
 
                 # Run a backward pass in the network, computing the loss and updating the weights
-                loss, cost = self.backward(layers_out, batch_data, batch_labels)
+                loss, cost, _, _ = self.backward(layers_out, batch_data, batch_labels)
                 av_loss += loss
                 av_cost += cost
 
@@ -138,7 +137,6 @@ class MultiLayerNetwork:
                     # If the cycle has ended, the learning rate will be at its lowest
                     # meaning it the model has reached a local minima
                     if self.eta == self.eta_min:
-                        cycle += 1
                         # Save weights & bias of the ith cycle
                         self.models[i] = [self.w.copy(), self.b.copy()]
 
@@ -155,9 +153,11 @@ class MultiLayerNetwork:
             if not ensemble:
                 self.models[0] = [self.w, self.b]  # if ensemble was disabled, just save the last model
 
-            val_loss, val_acc = self.test(val_data, val_labels)
+            val_loss, val_cost, val_acc = self.test(val_data, val_labels)
 
             self.loss_val_av_history.append(val_loss)
+            self.cost_val_av_history.append(val_cost)
+            self.acc_val_av_history.append(val_acc)
 
             if early_stop:
                 val_error = 1 - val_acc
@@ -174,6 +174,7 @@ class MultiLayerNetwork:
         models_out = {}
         models_accuracy = {}
         models_loss = {}
+        models_cost = {}
 
         test_labels = np.argmax(test_targets, axis=1)  # Convert one-hot to integer
 
@@ -186,6 +187,7 @@ class MultiLayerNetwork:
             model_out = np.zeros(test_labels.shape)
 
             test_average_loss_i = 0  # Initialize average loss of model i
+            test_average_cost_i = 0  # Initialize average cost of model i
 
             for batch in range(batch_epochs):
                 start = batch * self.n_batch
@@ -199,8 +201,10 @@ class MultiLayerNetwork:
 
                 loss, _ = self.cross_entropy_loss(layers_out[-1], batch_labels)
                 test_average_loss_i += loss
+                test_average_cost_i += loss + self.reg()
 
             models_loss[i] = test_average_loss_i / batch_epochs
+            models_cost[i] = test_average_cost_i / batch_epochs
             models_accuracy[i] = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
             models_out[i] = model_out  # Save the output of the model
 
@@ -217,8 +221,10 @@ class MultiLayerNetwork:
         test_average_acc = self.accuracy(average_out, test_labels)
         # Average loss over all models
         test_average_loss = np.sum(list(models_loss.values())) / len(models_loss)
+        # Average cost over all models
+        test_average_cost = np.sum(list(models_cost.values())) / len(models_cost)
 
-        return test_average_loss, test_average_acc
+        return test_average_loss, test_average_cost, test_average_acc
 
     def forward(self, data):
         """
@@ -255,10 +261,10 @@ class MultiLayerNetwork:
         loss, loss_out_grad = self.cross_entropy_loss(l_out[-1], targets)
 
         # Add the L2 Regularization term (lambda * ||W||^2) to the loss
-        loss = loss + self.reg()
+        cost = loss + self.reg()
 
-        # Set the loss gradient of the output layer to use it for the update
-        loss_i_grad = loss_out_grad
+        # Copy the loss gradient of the output layer to use it for the update
+        loss_i_grad = loss_out_grad.copy()
         # Initialize list to save the gradients
         weights_grads = [None] * len(l_out)
         bias_grads = [None] * len(l_out)
@@ -294,7 +300,7 @@ class MultiLayerNetwork:
             self.w[i] = self.w[i] - self.eta * weights_grads[i]
             self.b[i] = self.b[i] - self.eta * bias_grads[i]
 
-        return loss
+        return loss, cost, weights_grads, bias_grads
 
     def softmax(self, out):
         """
@@ -395,18 +401,26 @@ class MultiLayerNetwork:
         print(' Train Error: {}'.format(train_error))
         print(' Validation Error: {}'.format(val_error))
 
-    def plot_loss(self):
+    def plot_train_val_progress(self):
         """
-        Plot the history of the error
+        Plot loss, cost, accuracy
         """
-        x_axis = range(1, len(self.loss_train_av_history) + 1)
-        y_axis_train = self.loss_train_av_history
-        y_axis_val = self.loss_val_av_history
-        plt.plot(x_axis, y_axis_train, alpha=0.7, label="Train loss")
-        plt.plot(x_axis, y_axis_val, alpha=0.7, label="Validation loss")
-        plt.legend(loc='upper right')
-        plt.xlabel('epochs')
-        plt.ylabel('loss')
+        self.general_plot(self.loss_train_av_history, self.loss_val_av_history, title="Loss", xlabel="Update steps")
+        self.general_plot(self.cost_train_av_history, self.cost_val_av_history, title="Cost", xlabel="Update steps")
+        self.general_plot(self.acc_train_av_history, self.acc_val_av_history, title="Accuracy", xlabel="Update steps")
+
+    def general_plot(self, var_train, var_val, title=None, xlabel=None):
+        """
+        Plot the history of a variable
+        """
+        x_axis = np.arange(1, len(var_train) * self.n_batch + 1, self.n_batch)
+        y_axis_train = var_train
+        y_axis_val = var_val
+        plt.plot(x_axis, y_axis_train, color='green', alpha=0.7, label="Train " + title)
+        plt.plot(x_axis, y_axis_val, color='red', alpha=0.7, label="Validation " + title)
+        plt.legend()
+        plt.xlabel(xlabel)
+        plt.ylabel(title)
         plt.show()
 
     def plot_image(self, image, title=""):
@@ -429,9 +443,110 @@ class MultiLayerNetwork:
         """
         Plot the history of the error
         """
-        x_axis = range(1, len(self.eta_history) + 1)
+        x_axis = np.arange(1, len(self.eta_history) + 1)
         y_axis_eta = self.eta_history
         plt.plot(x_axis, y_axis_eta, alpha=0.7)
-        plt.xlabel('update steps')
-        plt.ylabel('eta values')
+        plt.xlabel('Update steps')
+        plt.ylabel('Eta values')
         plt.show()
+
+    def compare_grads(self, network_structure, data, labels):
+        """
+        Compare the results of the analytical and the numerical (centered difference) calculations of the gradients
+        """
+
+        d = data.shape[1]  # number of features
+
+        data = data.T
+        labels = labels.T
+
+        self.init_weights(network_structure, d)
+
+        init_w = copy.deepcopy(self.w)
+        init_b = copy.deepcopy(self.b)
+
+        # Calculate numerically
+        grad_w_num, grad_b_num = self.compute_grads_num(data, labels)
+
+        # Reset weights and bias to start from the same position
+        self.w = copy.deepcopy(init_w)
+        self.b = copy.deepcopy(init_b)
+
+        # Calculate analytically
+        l_out, _ = self.forward(data)
+        _, _,  grad_w_ana, grad_b_ana = self.backward(l_out, data, labels)
+
+        for i in range(len(grad_w_ana) - 1):
+            layer = np.random.randint(0, len(grad_w_ana) - 1)
+            node = np.random.randint(0, len(grad_w_ana[layer]))
+            print("Random samples of hidden layer {} of neuron {}".format(layer, node))
+            print(grad_w_num[layer][node][0:5])
+            print(grad_w_ana[layer][node][0:5])
+
+        print("Random samples of output layer of neuron 1")
+        print(grad_w_num[-1][0][:5])
+        print(grad_w_ana[-1][0][:5])
+
+        print("Average error differences between the numerical and the analytical computation of gradients: ")
+        for i in range(len(grad_w_ana) - 1):
+            print("Hidden layer {} weights: {}".format(i, np.mean(np.abs(grad_w_ana[i]) - np.abs(grad_w_num[i]))))
+
+        print("Output layer weights:", np.mean(np.abs(grad_w_ana[-1]) - np.abs(grad_w_num[-1])))
+        print("Output layer bias:", np.mean(np.abs(grad_b_ana[-1]) - np.abs(grad_b_num[-1])))
+
+    def compute_grads_num(self, data, targets):
+        """
+        Compute the gradients numerically to check if the analytic solution is correct
+        """
+
+        h = 1e-5
+
+        grad_w = []
+        grad_b = []
+
+        for j in range(len(self.b)):
+
+            grad_b_j = np.zeros(len(self.b[j]))
+            for i in range(len(self.b[j])):
+
+                self.b[j][i] = self.b[j][i] - h
+
+                layers_out, _ = self.forward(data)
+                c1, _ = self.cross_entropy_loss(layers_out[-1], targets)
+                c1 += self.reg()
+
+                self.b[j][i] = self.b[j][i] + 2*h
+                layers_out, _ = self.forward(data)
+                c2, _ = self.cross_entropy_loss(layers_out[-1], targets)
+                c2 += self.reg()
+
+                self.b[j][i] = self.b[j][i] - h
+                grad_b_j[i] = (c2 - c1) / (2 * h)
+
+            grad_b.append(grad_b_j)
+
+        for k in range(len(self.w)):
+
+            grad_w_k = np.zeros(self.w[k].shape)
+
+            for j in range(grad_w_k.shape[0]):
+
+                for i in range(grad_w_k.shape[1]):
+                    self.w[k][j][i] = self.w[k][j][i] - h
+
+                    layers_out, _ = self.forward(data)
+                    c1, _ = self.cross_entropy_loss(layers_out[-1], targets)
+                    c1 += self.reg()
+
+                    self.w[k][j][i] = self.w[k][j][i] + 2*h
+
+                    layers_out, _ = self.forward(data)
+                    c2, _ = self.cross_entropy_loss(layers_out[-1], targets)
+                    c2 += self.reg()
+
+                    self.w[k][j][i] = self.w[k][j][i] - h
+                    grad_w_k[j][i] = (c2 - c1) / (2 * h)
+
+            grad_w.append(grad_w_k)
+
+        return grad_w, grad_b

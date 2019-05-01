@@ -1,6 +1,4 @@
 """
-THIS FILE IS IDENTICAL IN MOST PARTS WITH THE RUN FILE FOUND IN ASSIGNMENT 1
-
 Created by Kostis S-Z @ 2019-03-27
 """
 
@@ -33,31 +31,50 @@ model_parameters = {
 # index_of_layer : number_of_nodes
 network_structure = {
     0: 50,
-    1: 10,
+    1: 50,
+    2: 50,
+    3: 10,  # Output layer should have the same number of nodes as classes to predict
 }
-
-#     2: 50,
-#     3: 10,  # Output layer should have the same number of nodes as classes to predict
-# }
 
 
 def main():
     # Use the loading function from Assignment 1
-    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=True)
+    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=True, val_size=5000)
 
     # Use the preprocessing function from Assignment 1
     train_x, train_y = preprocess_data(train_x, train_y)
     val_x, val_y = preprocess_data(val_x, val_y)
     test_x, test_y = preprocess_data(test_x, test_y)
 
-    # TODO: Maybe dont divide with 255 AND with std
     # Process the data so they have a zero mean
     mean, std = np.mean(train_x), np.std(train_x)  # Find mean and std of training data
     train_x = process_zero_mean(train_x, mean, std)
     val_x = process_zero_mean(val_x, mean, std)
     test_x = process_zero_mean(test_x, mean, std)
 
-    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    # Testing gradients
+    test_grad_computations(train_x, train_y)
+
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+
+
+def test_grad_computations(train_x, train_y):
+    """
+    Run one epoch and test if gradients are computed correctly
+    """
+    num_samples = 2
+    num_features = 30
+
+    train_x = train_x[:num_samples, :num_features]
+    train_y = train_y[:num_samples]
+
+    model_parameters["n_batch"] = num_samples  # size of data batches within an epoch
+    model_parameters["eta"] = 0.01  # size of data batches within an epoch
+    model_parameters["lambda_reg"] = 0.0  # size of data batches within an epoch
+
+    net = MultiLayerNetwork(**model_parameters)
+
+    net.compare_grads(network_structure, train_x, train_y)
 
 
 def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
@@ -65,16 +82,17 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     Train and test a two-layer network
     """
     net = MultiLayerNetwork(**model_parameters)
+    epochs = 20
 
     model_parameters["n_s"] = (5 * 45000) / model_parameters["n_batch"]
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
-              n_epochs=20, early_stop=False, ensemble=False, verbose=True)
+              n_epochs=epochs, early_stop=False, ensemble=False, verbose=True)
 
-    net.plot_loss()  # Plot the loss progress
+    net.plot_train_val_progress()
     net.plot_eta_history()
 
-    test_loss, test_accuracy = net.test(test_x, test_y)
+    test_loss, test_cost, test_accuracy = net.test(test_x, test_y)
 
     print("Test accuracy: ", test_accuracy)
 
