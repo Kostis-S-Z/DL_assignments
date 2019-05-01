@@ -41,7 +41,11 @@ class MultiLayerNetwork:
         self.p_iter = 0
         self.prev_val_error = 0
         self.loss_train_av_history = []
+        self.cost_train_av_history = []
+        self.acc_train_av_history = []
         self.loss_val_av_history = []
+        self.cost_val_av_history = []
+        self.acc_val_av_history = []
         self.eta_history = []
 
     def init_weights(self, net_structure, d):
@@ -83,6 +87,8 @@ class MultiLayerNetwork:
         batch_epochs = int(n / self.n_batch)
 
         self.loss_train_av_history = []
+        self.cost_train_av_history = []
+        self.acc_train_av_history = []
         self.eta_history = []
 
         iteration = 0
@@ -97,6 +103,7 @@ class MultiLayerNetwork:
 
             av_acc = 0  # Average epoch accuracy
             av_loss = 0  # Average epoch loss
+            av_cost = 0  # Average epoch cost
 
             for batch in range(batch_epochs):
                 # Calculate a new learning rate based on the CLR method
@@ -121,8 +128,9 @@ class MultiLayerNetwork:
                 layers_out, class_out = self.forward(batch_data)
 
                 # Run a backward pass in the network, computing the loss and updating the weights
-                loss = self.backward(layers_out, batch_data, batch_labels)
+                loss, cost = self.backward(layers_out, batch_data, batch_labels)
                 av_loss += loss
+                av_cost += cost
 
                 av_acc += self.accuracy(class_out, batch_classes)
 
@@ -135,8 +143,11 @@ class MultiLayerNetwork:
                         self.models[i] = [self.w.copy(), self.b.copy()]
 
             average_epoch_loss = av_loss / batch_epochs
+            average_epoch_cost = av_cost / batch_epochs
             average_epoch_acc = av_acc / batch_epochs
             self.loss_train_av_history.append(average_epoch_loss)
+            self.cost_train_av_history.append(average_epoch_cost)
+            self.acc_train_av_history.append(average_epoch_acc)
 
             if verbose:
                 print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
@@ -255,8 +266,8 @@ class MultiLayerNetwork:
         for layer_i in range(len(l_out)-1, 0, -1):
             # Calculate layer weight gradient based on the loss of that layer and the input of that layer
             w_i_grad = np.dot(loss_i_grad, l_out[layer_i-1].T) / self.n_batch
-            # Calculate layer bias gradient based on its loss
-            b_i_grad = np.sum(loss_i_grad, axis=0) / self.n_batch
+            # Calculate layer bias gradient based on its loss (maybe np.sum(loss_i_grad, axis=0) also works)
+            b_i_grad = np.dot(loss_i_grad, np.ones((self.n_batch, 1))) / self.n_batch
             # Compute gradient of regularization term w.r.t the OUTPUT weights
             reg_i_grad = 2 * self.lambda_reg * self.w[layer_i]
             # Save the gradients
@@ -271,7 +282,7 @@ class MultiLayerNetwork:
         # Calculate FIRST hidden layer weight and bias gradients
         w_0_grad = np.dot(loss_i_grad, data.T) / self.n_batch
         # Calculate layer bias gradient based on its loss
-        b_0_grad = np.sum(loss_i_grad, axis=0) / self.n_batch
+        b_0_grad = np.dot(loss_i_grad, np.ones((self.n_batch, 1))) / self.n_batch
         # Compute gradient of regularization term
         reg_0_grad = 2 * self.lambda_reg * self.w[0]
         # Save the gradients

@@ -155,6 +155,7 @@ class TwoLayerNetwork:
             if early_stop:
                 val_error = 1 - val_acc
                 if self.early_stopping(val_error):
+                    print("Model reached plateau. Early stopping enabled at epoch {}.".format(i))
                     break
 
         return val_acc
@@ -203,12 +204,13 @@ class TwoLayerNetwork:
             models_accuracy[i] = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
             models_out[i] = model_out  # Save the output of the model
 
-            # print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
-
         # Concatenate all results to a list
         results = []
         for i, model_results in models_out.items():
             results.append(model_results)
+
+        for i, model_acc in models_accuracy.items():
+            print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
 
         # Take majority vote across models
         average_out = mode(results, axis=0)[0]
@@ -346,7 +348,11 @@ class TwoLayerNetwork:
         to learn a more general representation of the data
         :return: a noisy batch
         """
-        return batch + np.random.normal(self.noise_m, self.noise_std, batch.shape)
+        noisy_batch = np.zeros(batch.shape)
+        for i, s in enumerate(batch):
+            noisy_batch[i] = s + np.random.normal(self.noise_m, self.noise_std, s.shape)
+        return noisy_batch
+        # return batch + np.random.normal(self.noise_m, self.noise_std, batch.shape)
 
     def cycle_eta(self, iteration):
         """
@@ -373,7 +379,6 @@ class TwoLayerNetwork:
         if diff < self.min_delta:
             self.p_iter += 1
             if self.p_iter > self.patience:
-                print("Model reached plateau. Early stopping enabled.")
                 return True
         else:
             self.p_iter = 0
@@ -405,7 +410,8 @@ class TwoLayerNetwork:
         """
         Plot the history of a variable
         """
-        x_axis = np.arange(1, len(var_train) * self.n_batch + 1, self.n_batch)
+        x_axis = range(1, len(var_train) + 1)
+        # x_axis = np.arange(1, len(var_train) * self.n_batch + 1, self.n_batch)
         y_axis_train = var_train
         y_axis_val = var_val
         plt.plot(x_axis, y_axis_train, color='green', alpha=0.7, label="Train " + title)

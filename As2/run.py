@@ -24,7 +24,7 @@ model_parameters = {
     "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
     "lambda_reg": 0.,  # regularizing term variable
     "min_delta": 0.01,  # minimum accepted validation error
-    "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
+    "patience": 7  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
 
@@ -63,44 +63,17 @@ def main():
     # lambda_search(train_x, train_y, val_x, val_y)
 
     # Train a network with optimal hyper-parameter values using almost all of the data
-    #  use_all=True, val_size=1000 | cycles = 3 | n_s = 1000 | lambda = 0.00087
-    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    #  use_all=True, val_size=1000 | cycles = 5 | n_s = 1000 | lambda = 0.00087
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y, n_cycles=5)
 
     # Report the effect of adding noise to the training data
-    # TODO:
-    #  - test 4 std values without regularisation
-    #  - test 4 std values with regularisation
-    model_parameters["train_noisy"] = True
-    model_parameters["noise_std"] = 0.01
-    model_parameters["noise_std"] = 0.05
-    model_parameters["noise_std"] = 0.1
-    model_parameters["noise_std"] = 0.15
-    cycles = 3
-    n_s = 900
-    lambda_reg = 0.
-    lambda_reg = 0.01
-    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    # test_noise(train_x, train_y, val_x, val_y, test_x, test_y)
 
     # Report the effect of different number of nodes
-    # TODO:
-    #  - test with 50 / 100 / 1000 / 3072 nodes without regularisation without noise
-    model_parameters["train_noisy"] = False
-    network_structure[0] = 50
-    network_structure[0] = 100
-    network_structure[0] = 1000
-    network_structure[0] = 3072
-    cycles = 3
-    n_s = 900
-    lambda_reg = 0.
+    # test_nodes(train_x, train_y, val_x, val_y, test_x, test_y)
 
     # Report the effect of ensemble method
-    # TODO:
-    #  - test with the ensemble method for 5 / 10 / 15 cycles
-    #  - test without the ensemble method for 1 / 3 / 5 / 10 cycles
-
-    cycles = 10
-    n_s = 900
-    lambda_reg = 0.01  # OPTIMAL LAMBDA
+    test_ensemble(train_x, train_y, val_x, val_y, test_x, test_y)
 
 
 def test_grad_computations(train_x, train_y):
@@ -142,22 +115,37 @@ def overfit_test(train_x, train_y):
     print("Test accuracy: ", test_accuracy)
 
 
-def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
+def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y, n_cycles=3, use_ensemble=False, early_stop=False):
     """
     Train and test a two-layer network
-    """
-    cycles = 3
-    n_s = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
+
+    Model 1:
+    n_s = 500
+    cycle = 1
+
+    Model 2:
+    n_s = 800
+    cycle = 3
+
+    lambda = 0.01
+
+    n_s = 800
     num_iters = 2 * n_s * cycles
-    model_parameters["n_batch"] = 100
     epochs = int(num_iters / model_parameters["n_batch"])
-    model_parameters["lambda_reg"] = 0.00087
+    """
+
+    cycles = n_cycles
+    # n_s = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
+    n_s = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
+    epochs = cycles * 2 * 2
+
     model_parameters["n_s"] = n_s
+    model_parameters["lambda_reg"] = 0.00087
 
     net = TwoLayerNetwork(**model_parameters)
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
-              n_epochs=epochs, early_stop=False, ensemble=False, verbose=True)
+              n_epochs=epochs, early_stop=early_stop, ensemble=use_ensemble, verbose=False)
 
     net.plot_train_val_progress()
     net.plot_eta_history()
@@ -231,6 +219,44 @@ def lambda_search(train_x, train_y, val_x, val_y):
 
     with open('lambda_results_' + title + '.json', 'w') as fp:
         json.dump(results, fp, sort_keys=True, indent=2)
+
+
+def test_noise(train_x, train_y, val_x, val_y, test_x, test_y):
+
+    noises = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25]
+    model_parameters["train_noisy"] = True
+
+    for noise in noises:
+        model_parameters["noise_std"] = noise
+        print("noise: {} ".format(noise), end="")
+        train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+
+    model_parameters["train_noisy"] = False
+
+
+def test_nodes(train_x, train_y, val_x, val_y, test_x, test_y):
+
+    nodes = [50, 100, 1000, 3072]
+    cycles = 10
+    for n_nodes in nodes:
+        network_structure[0] = n_nodes
+        print("Nodes : ", n_nodes, end="")
+        train_a_network(train_x, train_y, val_x, val_y, test_x, test_y, n_cycles=cycles, early_stop=True)
+
+    network_structure[0] = 50
+
+
+def test_ensemble(train_x, train_y, val_x, val_y, test_x, test_y):
+
+    cycles = [10] # [5, 10, 15]
+    for n_cycles in cycles:
+        print("Ensemble: Yes Cycles : ", n_cycles, end="")
+        train_a_network(train_x, train_y, val_x, val_y, test_x, test_y, n_cycles=n_cycles, use_ensemble=True)
+    exit()
+    cycles = [3, 5, 10]
+    for n_cycles in cycles:
+        print("Ensemble: No Cycles : ", n_cycles, end="")
+        train_a_network(train_x, train_y, val_x, val_y, test_x, test_y, n_cycles=n_cycles, use_ensemble=False)
 
 
 if __name__ == "__main__":
