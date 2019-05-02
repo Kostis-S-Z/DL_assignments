@@ -33,7 +33,7 @@ network_structure = {
     0: 50,
     1: 50,
     2: 50,
-    3: 10,  # Output layer should have the same number of nodes as classes to predict
+    3: 10  # Output layer should have the same number of nodes as classes to predict
 }
 
 
@@ -53,7 +53,10 @@ def main():
     test_x = process_zero_mean(test_x, mean, std)
 
     # Testing gradients
-    test_grad_computations(train_x, train_y)
+    # test_grad_computations(train_x, train_y)
+
+    # Training simple k-layer networks
+    train_simple(train_x, train_y, val_x, val_y, test_x, test_y)
 
     # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
@@ -69,12 +72,46 @@ def test_grad_computations(train_x, train_y):
     train_y = train_y[:num_samples]
 
     model_parameters["n_batch"] = num_samples  # size of data batches within an epoch
-    model_parameters["eta"] = 0.01  # size of data batches within an epoch
-    model_parameters["lambda_reg"] = 0.0  # size of data batches within an epoch
+    model_parameters["eta"] = 0.01
+    model_parameters["lambda_reg"] = 0.0
 
     net = MultiLayerNetwork(**model_parameters)
 
     net.compare_grads(network_structure, train_x, train_y)
+
+
+def train_simple(train_x, train_y, val_x, val_y, test_x, test_y):
+    """
+    Train a 2/3/9-layer network
+    """
+    n_s = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
+    model_parameters["n_s"] = n_s
+    model_parameters["lambda_reg"] = 0.00087
+    layer2 = {0: 50, 1: 10}
+
+    pa = 5
+    cycles = 2
+    n_s = (pa * 45000) / model_parameters["n_batch"]
+    epochs = cycles * pa * 2
+    model_parameters["lambda_reg"] = 0.005
+    model_parameters["n_s"] = n_s
+
+    layer3 = {0: 50, 1: 50, 2: 10}
+    layer9 = {0: 50, 1: 30, 2: 20, 3: 20, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10}
+
+    network_structure = layer3
+
+    net = MultiLayerNetwork(**model_parameters)
+
+    net.train(network_structure, train_x, train_y, val_x, val_y,
+              n_epochs=epochs, batch_norm=False, early_stop=False, ensemble=False, verbose=True)
+
+    net.plot_train_val_progress()
+    net.plot_eta_history()
+
+    test_loss, test_cost, test_accuracy = net.test(test_x, test_y)
+
+    print("Test accuracy: ", test_accuracy)
 
 
 def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):

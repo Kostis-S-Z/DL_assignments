@@ -75,7 +75,7 @@ class MultiLayerNetwork:
             self.b.append(np.array(hidden_bias))
 
     def train(self, network_structure, data, labels, val_data, val_labels,
-              n_epochs=100, early_stop=False, ensemble=False, verbose=False):
+              n_epochs=100, batch_norm=False, early_stop=False, ensemble=False, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
@@ -96,9 +96,9 @@ class MultiLayerNetwork:
         for i in range(n_epochs):
 
             # Shuffle the data and the labels across samples
-            # np.random.shuffle(indices)  # shuffle the indices and then the data and labels based on this
-            # data = data[indices]  # current form of data: samples x features
-            # labels = labels[indices]
+            np.random.shuffle(indices)  # shuffle the indices and then the data and labels based on this
+            data = data[indices]  # current form of data: samples x features
+            labels = labels[indices]
 
             av_acc = 0  # Average epoch accuracy
             av_loss = 0  # Average epoch loss
@@ -413,7 +413,8 @@ class MultiLayerNetwork:
         """
         Plot the history of a variable
         """
-        x_axis = np.arange(1, len(var_train) * self.n_batch + 1, self.n_batch)
+        x_axis = range(1, len(var_train) + 1)
+        # x_axis = np.arange(1, len(var_train) * self.n_batch + 1, self.n_batch)
         y_axis_train = var_train
         y_axis_val = var_val
         plt.plot(x_axis, y_axis_train, color='green', alpha=0.7, label="Train " + title)
@@ -490,6 +491,7 @@ class MultiLayerNetwork:
         print("Average error differences between the numerical and the analytical computation of gradients: ")
         for i in range(len(grad_w_ana) - 1):
             print("Hidden layer {} weights: {}".format(i, np.mean(np.abs(grad_w_ana[i]) - np.abs(grad_w_num[i]))))
+            print("Hidden bias {} weights: {}".format(i, np.mean(np.abs(grad_b_ana[i]) - np.abs(grad_b_num[i]))))
 
         print("Output layer weights:", np.mean(np.abs(grad_w_ana[-1]) - np.abs(grad_w_num[-1])))
         print("Output layer bias:", np.mean(np.abs(grad_b_ana[-1]) - np.abs(grad_b_num[-1])))
