@@ -31,5 +31,5 @@ Next, we expand the network to use two layers and cyclical learning rates.
 ##### Features:
 
 - Easy way to setup whole structure of network
-- Batch Normalization
+- Batch Normalization to reduce the dependency of the network from the initialization values and be able to use a higher learning rate
 
