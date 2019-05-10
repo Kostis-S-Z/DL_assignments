@@ -276,13 +276,27 @@ class MultiLayerNetwork:
         # Add the L2 Regularization term (lambda * ||W||^2) to the loss
         cost = loss + self.reg()
 
-        # Copy the loss gradient of the output layer to use it for the update
-        loss_i_grad = loss_out_grad.copy()
         # Initialize list to save the gradients
         weights_grads = [None] * len(l_out)
         bias_grads = [None] * len(l_out)
-        # Update backwards, from output layer to SECOND layer. The first layer is dependent on the data
-        for layer_i in range(len(l_out)-1, 0, -1):
+
+        # Calculate output layer
+        w_out_grad = np.dot(loss_out_grad, l_out[-2].T) / self.n_batch  # TODO: check if -1 or -2 (probably -2)
+        b_out_grad = np.sum(loss_out_grad, axis=0) / self.n_batch
+        reg_out_grad = 2 * self.lambda_reg * self.w[-1]
+        weights_grads[-1] = w_out_grad + reg_out_grad
+        bias_grads[-1] = b_out_grad
+
+        loss_i_grad = np.dot(self.w[-1].T, loss_out_grad)  # Current (Next) layer's weights x current gradient
+        indicator = l_out[-2] > 0  # indicator based on output previous layer output
+        loss_i_grad = loss_i_grad * indicator
+
+        # Update backwards, from last HIDDEN layer to SECOND HIDDEN layer. The first layer is dependant on the data
+        for layer_i in range(len(l_out)-2, 0, -1):
+
+            if self.batch_norm is not None:
+                loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad)
+
             # Calculate layer weight gradient based on the loss of that layer and the input of that layer
             w_i_grad = np.dot(loss_i_grad, l_out[layer_i-1].T) / self.n_batch
             # Calculate layer bias gradient based on its loss (maybe np.sum(loss_i_grad, axis=0) also works)
@@ -299,6 +313,9 @@ class MultiLayerNetwork:
             loss_i_grad = loss_i_grad * indicator
 
         # Calculate FIRST hidden layer weight and bias gradients
+        if self.batch_norm is not None:
+            loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad)
+
         w_0_grad = np.dot(loss_i_grad, data.T) / self.n_batch
         # Calculate layer bias gradient based on its loss
         b_0_grad = np.dot(loss_i_grad, np.ones((self.n_batch, 1))) / self.n_batch
