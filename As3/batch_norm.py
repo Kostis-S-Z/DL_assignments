@@ -132,6 +132,9 @@ def backward(self, l_out, unfilt_out, bn_out, means, vars, betas, gammas, data, 
         self.w[i] = self.w[i] - self.eta * weights_grads[i]
         self.b[i] = self.b[i] - self.eta * bias_grads[i]
 
+        self.gamma[i] = self.gamma[i] - self.eta * gammas_grads[i]
+        self.beta[i] = self.beta[i] - self.eta * betas_grads[i]
+
     return loss
 
 

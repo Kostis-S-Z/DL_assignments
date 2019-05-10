@@ -36,6 +36,9 @@ class MultiLayerNetwork:
 
         self.w = []
         self.b = []
+        self.batch_norm = False
+        self.gamma = []
+        self.beta = []
         self.models = {}  # Variable to save the weights of the model at the end of each cycle to use it during ensemble
         self.p_iter = 0
         self.eta = 0.01
@@ -74,6 +77,15 @@ class MultiLayerNetwork:
             self.w.append(np.array(w_layer_i))
             self.b.append(np.array(hidden_bias))
 
+            if self.batch_norm:
+                # Choose between zeros, ones, random initialization
+                zeros = np.zeros(net_structure[l]).reshape(-1, 1)
+                ones = np.ones(net_structure[l]).reshape(-1, 1)
+                random = np.random.normal(mean, std, net_structure[l])
+                # Initialize beta & gamma
+                self.gamma.append(zeros)
+                self.beta.append(zeros)
+
     def train(self, network_structure, data, labels, val_data, val_labels,
               n_epochs=100, batch_norm=False, early_stop=False, ensemble=False, verbose=False):
         """
@@ -82,6 +94,8 @@ class MultiLayerNetwork:
         n = data.shape[0]  # number of samples
         d = data.shape[1]  # number of features
         indices = np.arange(n)  # a list of the indices of the data to shuffle
+        self.batch_norm = batch_norm
+
         self.init_weights(network_structure, d)
 
         batch_epochs = int(n / self.n_batch)
@@ -232,9 +246,29 @@ class MultiLayerNetwork:
         """
         layers_out = []
         input_of_layer = data
+
+        # For batch norm
+        layers_out_s = []
+        layers_out_s_hat = []
+        means = []
+        vars = []
+
         for layer in range(len(self.w) - 1):
             # calculate the ith hidden layer
             s_i = np.dot(self.w[layer], input_of_layer) + self.b[layer]
+
+            if self.batch_norm:
+                # Calculate new s, mean and variance
+                s_i_hat, mean, var = 0, 0, 0
+
+                # Update s
+
+                # Save outputs  
+                layers_out_s.append(s_i)
+                layers_out_s_hat.append(s_i_hat)
+                means.append(mean)
+                vars.append(var)
+
             # apply ReLU activation function
             h_i = self.relu(s_i)
             # save the output of that layer
