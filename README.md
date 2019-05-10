@@ -31,5 +31,8 @@ Next, we expand the network to use two layers and cyclical learning rates.
 ##### Features:
 
 - Easy way to setup whole structure of network
-- Batch Normalization to reduce the dependency of the network from the initialization values and be able to use a higher learning rate
+- Batch Normalization: 
+Method to reduce the dependency of the network from the initialization values and be able to use a higher learning rate.
+It normalizes the activations in a standard normal distribution (with zero mean and 1 std) and using learnable parameters (gamma and beta) and a linear transformation, it enables us to learn what distribution fits most for the activations of the layers.
+This will stop the problem of vanishing / exploding gradients as the outputs will no longer be saturated. 
 
