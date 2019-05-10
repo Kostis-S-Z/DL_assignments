@@ -7,6 +7,8 @@ import numpy as np
 from scipy.stats import mode
 from matplotlib import pyplot as plt
 
+from batch_norm import BatchNormalization
+
 
 class MultiLayerNetwork:
 
@@ -36,6 +38,7 @@ class MultiLayerNetwork:
 
         self.w = []
         self.b = []
+        self.batch_norm = None
         self.models = {}  # Variable to save the weights of the model at the end of each cycle to use it during ensemble
         self.p_iter = 0
         self.eta = 0.01
@@ -67,22 +70,26 @@ class MultiLayerNetwork:
             w_layer_i = np.random.normal(mean, std, (net_structure[l], dim_prev_layer))
             # Initialize bias column vector of layer i
             hidden_bias = np.zeros(net_structure[l]).reshape(-1, 1)
+
             # The second dimension of the weight matrix of the next layer is the number of nodes of the current one
             dim_prev_layer = net_structure[l]
-
             # Add weights & bias to network
             self.w.append(np.array(w_layer_i))
             self.b.append(np.array(hidden_bias))
 
     def train(self, network_structure, data, labels, val_data, val_labels,
-              n_epochs=100, batch_norm=False, early_stop=False, ensemble=False, verbose=False):
+              n_epochs=100, use_batch_norm=False, early_stop=False, ensemble=False, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
         n = data.shape[0]  # number of samples
         d = data.shape[1]  # number of features
         indices = np.arange(n)  # a list of the indices of the data to shuffle
+
         self.init_weights(network_structure, d)
+
+        if use_batch_norm:
+            self.batch_norm = BatchNormalization(network_structure)
 
         batch_epochs = int(n / self.n_batch)
 
@@ -232,9 +239,15 @@ class MultiLayerNetwork:
         """
         layers_out = []
         input_of_layer = data
+
         for layer in range(len(self.w) - 1):
             # calculate the ith hidden layer
             s_i = np.dot(self.w[layer], input_of_layer) + self.b[layer]
+
+            if self.batch_norm is not None:
+                # Normalize (scale & shift) output to a better distribution
+                s_i = self.batch_norm.forward_per_layer(s_i, layer)
+
             # apply ReLU activation function
             h_i = self.relu(s_i)
             # save the output of that layer
