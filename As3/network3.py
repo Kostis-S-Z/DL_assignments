@@ -70,21 +70,21 @@ class MultiLayerNetwork:
             w_layer_i = np.random.normal(mean, std, (net_structure[l], dim_prev_layer))
             # Initialize bias column vector of layer i
             hidden_bias = np.zeros(net_structure[l]).reshape(-1, 1)
-            # The second dimension of the weight matrix of the next layer is the number of nodes of the current one
-            dim_prev_layer = net_structure[l]
-
-            # Add weights & bias to network
-            self.w.append(np.array(w_layer_i))
-            self.b.append(np.array(hidden_bias))
 
             if self.batch_norm:
                 # Choose between zeros, ones, random initialization
-                zeros = np.zeros(net_structure[l]).reshape(-1, 1)
-                ones = np.ones(net_structure[l]).reshape(-1, 1)
-                random = np.random.normal(mean, std, net_structure[l])
+                zeros = np.zeros((net_structure[l], 1))
+                ones = np.ones((net_structure[l], 1))
+                random = np.random.normal(mean, std, (net_structure[l], 1))
                 # Initialize beta & gamma
-                self.gamma.append(zeros)
+                self.gamma.append(random)
                 self.beta.append(zeros)
+
+            # The second dimension of the weight matrix of the next layer is the number of nodes of the current one
+            dim_prev_layer = net_structure[l]
+            # Add weights & bias to network
+            self.w.append(np.array(w_layer_i))
+            self.b.append(np.array(hidden_bias))
 
     def train(self, network_structure, data, labels, val_data, val_labels,
               n_epochs=100, batch_norm=False, early_stop=False, ensemble=False, verbose=False):
@@ -248,26 +248,32 @@ class MultiLayerNetwork:
         input_of_layer = data
 
         # For batch norm
+        e = 1e-16
         layers_out_s = []
-        layers_out_s_hat = []
-        means = []
-        vars = []
+        layers_out_s_norm = []
+        layer_means = []
+        layer_vars = []
 
         for layer in range(len(self.w) - 1):
             # calculate the ith hidden layer
             s_i = np.dot(self.w[layer], input_of_layer) + self.b[layer]
 
             if self.batch_norm:
-                # Calculate new s, mean and variance
-                s_i_hat, mean, var = 0, 0, 0
+                layers_out_s.append(s_i)
+                # Calculate mean and variance over the samples (the batch size)
+                mean_i = np.mean(s_i, axis=0)
+                var_i = np.var(s_i, axis=0)
+
+                # Scale and shift to a normalized activation
+                s_i_norm = (s_i - mean_i) / ((var_i + e) ** (-0.5))
 
                 # Update s
+                s_i = self.gamma[layer] * s_i_norm + self.beta[layer]
 
-                # Save outputs  
-                layers_out_s.append(s_i)
-                layers_out_s_hat.append(s_i_hat)
-                means.append(mean)
-                vars.append(var)
+                # Save outputs
+                layer_means.append(mean_i)
+                layer_vars.append(var_i)
+                layers_out_s_norm.append(s_i_norm)
 
             # apply ReLU activation function
             h_i = self.relu(s_i)
