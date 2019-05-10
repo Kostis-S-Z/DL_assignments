@@ -89,7 +89,7 @@ class MultiLayerNetwork:
         self.init_weights(network_structure, d)
 
         if use_batch_norm:
-            self.batch_norm = BatchNormalization(network_structure)
+            self.batch_norm = BatchNormalization(network_structure, self.n_batch)
 
         batch_epochs = int(n / self.n_batch)
 
@@ -295,7 +295,7 @@ class MultiLayerNetwork:
         for layer_i in range(len(l_out)-2, 0, -1):
 
             if self.batch_norm is not None:
-                loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad)
+                loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad, layer_i)
 
             # Calculate layer weight gradient based on the loss of that layer and the input of that layer
             w_i_grad = np.dot(loss_i_grad, l_out[layer_i-1].T) / self.n_batch
@@ -314,7 +314,7 @@ class MultiLayerNetwork:
 
         # Calculate FIRST hidden layer weight and bias gradients
         if self.batch_norm is not None:
-            loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad)
+            loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad, 0)
 
         w_0_grad = np.dot(loss_i_grad, data.T) / self.n_batch
         # Calculate layer bias gradient based on its loss

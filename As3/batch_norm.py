@@ -9,7 +9,9 @@ class BatchNormalization:
     Class to save parameters of Batch Normalization method
     """
 
-    def __init__(self, net_structure):
+    def __init__(self, net_structure, batch_size):
+
+        self.n_batch = batch_size
 
         self.gamma = []
         self.beta = []
@@ -40,8 +42,8 @@ class BatchNormalization:
             self.gamma.append(random)
             self.beta.append(zeros)
 
-        self.gamma_grads = [None] * len(net_structure - 1)
-        self.beta_grads = [None] * len(net_structure - 1)
+        self.gamma_grads = [None] * (len(net_structure) - 1)
+        self.beta_grads = [None] * (len(net_structure) - 1)
 
     def forward_per_layer(self, s_i, layer):
         """
@@ -86,7 +88,8 @@ class BatchNormalization:
         g_out = np.dot(self.gamma[layer_i], np.ones((self.n_batch, 1)).T)
         loss_i_grad = loss_i_grad * g_out
 
-        loss_i_grad = self.bn_backpass(loss_i_grad)
+        # TODO fix this
+        # loss_i_grad = self.bn_backpass(loss_i_grad)
 
         # If you are in the first layer, update all gamma and beta from the gradients
         if layer_i == 0:

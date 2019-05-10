@@ -56,9 +56,9 @@ def main():
     # test_grad_computations(train_x, train_y)
 
     # Training simple k-layer networks
-    train_simple(train_x, train_y, val_x, val_y, test_x, test_y)
+    # train_simple(train_x, train_y, val_x, val_y, test_x, test_y)
 
-    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
 
 def test_grad_computations(train_x, train_y):
@@ -104,7 +104,7 @@ def train_simple(train_x, train_y, val_x, val_y, test_x, test_y):
     net = MultiLayerNetwork(**model_parameters)
 
     net.train(network_structure, train_x, train_y, val_x, val_y,
-              n_epochs=epochs, batch_norm=False, early_stop=False, ensemble=False, verbose=True)
+              n_epochs=epochs, use_batch_norm=False, early_stop=False, ensemble=False, verbose=True)
 
     net.plot_train_val_progress()
     net.plot_eta_history()
@@ -123,7 +123,7 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
 
     model_parameters["n_s"] = (5 * 45000) / model_parameters["n_batch"]
 
-    net.train(network_structure, train_x, train_y, val_x, val_y,
+    net.train(network_structure, train_x, train_y, val_x, val_y, use_batch_norm=True,
               n_epochs=epochs, early_stop=False, ensemble=False, verbose=True)
 
     net.plot_train_val_progress()
