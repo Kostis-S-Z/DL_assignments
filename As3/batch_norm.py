@@ -10,12 +10,22 @@ class BatchNormalization:
 
     means: mx1 (a mean per node)
     vars: mx1 (a variance per node)
-    """
 
-    def __init__(self, net_structure, batch_size):
+    gamma:
+    beta:
+
+    gamma_grads:
+    beta_grads:
+
+    m_av:
+    var_av:
+    """
+    # TODO: what learning rate?
+    def __init__(self, net_structure, batch_size, alpha=0.5, learning_rate=0.1):
 
         self.n_batch = batch_size
-        self.alpha = 0.7  # smaller than 0.9
+        self.alpha = alpha  # smaller than 0.9
+        self.eta_bn = learning_rate
 
         self.gamma = []
         self.beta = []
@@ -47,7 +57,7 @@ class BatchNormalization:
             random = np.random.normal(mean, std, (net_structure[l], 1))
             # Initialize beta & gamma
             self.gamma.append(random)
-            self.beta.append(zeros)
+            self.beta.append(random)
             # Initialize moving average of mean and variance
             self.m_av.append(0)
             self.var_av.append(0)
@@ -63,7 +73,7 @@ class BatchNormalization:
         :param testing: use precomputed mean and average during testing
         :return: the normalized output
         """
-        self.l_out_unnorm.append(s_i)
+        self.l_out_unnorm.append(s_i)  # s_i: m (number of nodes) X batch size
 
         if testing:
             # This is used for testing
@@ -114,8 +124,8 @@ class BatchNormalization:
             # Update backwards
             for i in range(len(self.gamma) - 1, -1, -1):
                 # TODO: how do you update gamma and beta exactly? do you use a learning rate?
-                self.gamma[i] = self.gamma[i] - self.gamma_grads[i]
-                self.beta[i] = self.beta[i] - self.beta_grads[i]
+                self.gamma[i] = self.gamma[i] - (self.eta_bn * self.gamma_grads[i])
+                self.beta[i] = self.beta[i] - (self.eta_bn * self.beta_grads[i])
                 self.update_moving_av(i)
 
         return loss_i_grad

@@ -77,8 +77,8 @@ class MultiLayerNetwork:
             self.w.append(np.array(w_layer_i))
             self.b.append(np.array(hidden_bias))
 
-    def train(self, network_structure, data, labels, val_data, val_labels,
-              n_epochs=100, use_batch_norm=False, early_stop=False, ensemble=False, verbose=False):
+    def train(self, network_structure, data, labels, val_data=None, val_labels=None, n_epochs=100,
+              use_batch_norm=False, early_stop=False, ensemble=False, verbose=False):
         """
         Compute forward and backward pass for a number of epochs
         """
@@ -146,7 +146,6 @@ class MultiLayerNetwork:
                     if self.eta == self.eta_min:
                         # Save weights & bias of the ith cycle
                         self.models[i] = [self.w.copy(), self.b.copy()]
-
             average_epoch_loss = av_loss / batch_epochs
             average_epoch_cost = av_cost / batch_epochs
             average_epoch_acc = av_acc / batch_epochs
@@ -160,16 +159,17 @@ class MultiLayerNetwork:
             if not ensemble:
                 self.models[0] = [self.w, self.b]  # if ensemble was disabled, just save the last model
 
-            val_loss, val_cost, val_acc = self.test(val_data, val_labels)
+            if val_data is not None:
+                val_loss, val_cost, val_acc = self.test(val_data, val_labels)
 
-            self.loss_val_av_history.append(val_loss)
-            self.cost_val_av_history.append(val_cost)
-            self.acc_val_av_history.append(val_acc)
+                self.loss_val_av_history.append(val_loss)
+                self.cost_val_av_history.append(val_cost)
+                self.acc_val_av_history.append(val_acc)
 
-            if early_stop:
-                val_error = 1 - val_acc
-                if self.early_stopping(val_error):
-                    break
+                if early_stop:
+                    val_error = 1 - val_acc
+                    if self.early_stopping(val_error):
+                        break
 
     def test(self, test_data, test_targets):
         """
@@ -481,7 +481,7 @@ class MultiLayerNetwork:
         plt.ylabel('Eta values')
         plt.show()
 
-    def compare_grads(self, network_structure, data, labels):
+    def compare_grads(self, network_structure, data, labels, use_batch_norm=False):
         """
         Compare the results of the analytical and the numerical (centered difference) calculations of the gradients
         """
@@ -493,8 +493,14 @@ class MultiLayerNetwork:
 
         self.init_weights(network_structure, d)
 
+        if use_batch_norm:
+            self.batch_norm = BatchNormalization(network_structure, self.n_batch)
+
         init_w = copy.deepcopy(self.w)
         init_b = copy.deepcopy(self.b)
+
+        init_gamma = copy.deepcopy(self.batch_norm.gamma)
+        init_beta = copy.deepcopy(self.batch_norm.beta)
 
         # Calculate numerically
         grad_w_num, grad_b_num, grad_gamma_num, grad_beta_num = self.compute_grads_num(data, labels)
@@ -503,9 +509,15 @@ class MultiLayerNetwork:
         self.w = copy.deepcopy(init_w)
         self.b = copy.deepcopy(init_b)
 
+        self.batch_norm.gamma = copy.deepcopy(init_gamma)
+        self.batch_norm.beta = copy.deepcopy(init_beta)
+
         # Calculate analytically
         l_out, _ = self.forward(data)
         _, _,  grad_w_ana, grad_b_ana = self.backward(l_out, data, labels)
+
+        grad_gamma_ana = self.batch_norm.gamma_grads
+        grad_beta_ana = self.batch_norm.beta_grads
 
         for i in range(len(grad_w_ana) - 1):
             layer = np.random.randint(0, len(grad_w_ana) - 1)
@@ -513,6 +525,9 @@ class MultiLayerNetwork:
             print("Random samples of hidden layer {} of neuron {}".format(layer, node))
             print(grad_w_num[layer][node][0:5])
             print(grad_w_ana[layer][node][0:5])
+
+            # print(grad_gamma_num[layer][node])
+            # print(grad_gamma_ana[layer][node])
 
         print("Random samples of output layer of neuron 1")
         print(grad_w_num[-1][0][:5])
@@ -523,8 +538,8 @@ class MultiLayerNetwork:
             print("Hidden layer {} weights: {}".format(i, np.mean(np.abs(grad_w_ana[i]) - np.abs(grad_w_num[i]))))
             print("Hidden bias {} weights: {}".format(i, np.mean(np.abs(grad_b_ana[i]) - np.abs(grad_b_num[i]))))
 
-        print("Output layer weights:", np.mean(np.abs(grad_w_ana[-1]) - np.abs(grad_w_num[-1])))
-        print("Output layer bias:", np.mean(np.abs(grad_b_ana[-1]) - np.abs(grad_b_num[-1])))
+        # print("Output layer weights:", np.mean(np.abs(grad_w_ana[-1]) - np.abs(grad_w_num[-1])))
+        # print("Output layer bias:", np.mean(np.abs(grad_b_ana[-1]) - np.abs(grad_b_num[-1])))
 
     def compute_grads_num(self, data, targets):
         """

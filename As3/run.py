@@ -29,17 +29,17 @@ model_parameters = {
 }
 
 # index_of_layer : number_of_nodes
-network_structure = {
-    0: 50,
-    1: 50,
-    2: 50,
-    3: 10  # Output layer should have the same number of nodes as classes to predict
-}
+
+layer2 = {0: 50, 1: 10}
+layer3 = {0: 50, 1: 50, 2: 10}
+layer9 = {0: 50, 1: 30, 2: 20, 3: 20, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10}
+
+network_structure = layer9
 
 
 def main():
     # Use the loading function from Assignment 1
-    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=True, val_size=5000)
+    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=False, val_size=5000)
 
     # Use the preprocessing function from Assignment 1
     train_x, train_y = preprocess_data(train_x, train_y)
@@ -77,7 +77,7 @@ def test_grad_computations(train_x, train_y):
 
     net = MultiLayerNetwork(**model_parameters)
 
-    net.compare_grads(network_structure, train_x, train_y)
+    net.compare_grads(network_structure, train_x, train_y, use_batch_norm=True)
 
 
 def train_simple(train_x, train_y, val_x, val_y, test_x, test_y):
@@ -95,11 +95,6 @@ def train_simple(train_x, train_y, val_x, val_y, test_x, test_y):
     epochs = cycles * pa * 2
     model_parameters["lambda_reg"] = 0.005
     model_parameters["n_s"] = n_s
-
-    layer3 = {0: 50, 1: 50, 2: 10}
-    layer9 = {0: 50, 1: 30, 2: 20, 3: 20, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10}
-
-    network_structure = layer3
 
     net = MultiLayerNetwork(**model_parameters)
 
@@ -119,12 +114,16 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     Train and test a two-layer network
     """
     net = MultiLayerNetwork(**model_parameters)
-    epochs = 20
+    epochs = 50
 
-    model_parameters["n_s"] = (5 * 45000) / model_parameters["n_batch"]
+    model_parameters["n_s"] = 800  # (5 * 45000) / model_parameters["n_batch"]
 
-    net.train(network_structure, train_x, train_y, val_x, val_y, use_batch_norm=True,
-              n_epochs=epochs, early_stop=False, ensemble=False, verbose=True)
+    # train_x = train_x[:10, :3]
+
+    net.train(network_structure, train_x, train_y, n_epochs=epochs,
+              use_batch_norm=True, early_stop=False, ensemble=False, verbose=True)
+    # net.train(network_structure, train_x, train_y, val_data=val_x, val_labels=val_y, n_epochs=epochs,
+    #           use_batch_norm=True, early_stop=False, ensemble=False, verbose=True)
 
     net.plot_train_val_progress()
     net.plot_eta_history()
