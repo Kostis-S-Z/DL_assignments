@@ -203,7 +203,7 @@ class MultiLayerNetwork:
                 batch_data = test_data[start:end].T
                 batch_labels = test_targets[start:end].T
 
-                layers_out, class_out = self.forward(batch_data)
+                layers_out, class_out = self.forward(batch_data, testing=True)
                 model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
 
                 loss, _ = self.cross_entropy_loss(layers_out[-1], batch_labels)
@@ -233,7 +233,7 @@ class MultiLayerNetwork:
 
         return test_average_loss, test_average_cost, test_average_acc
 
-    def forward(self, data):
+    def forward(self, data, testing=False):
         """
         A forward pass in the network computing the predicted class
         """
@@ -246,7 +246,7 @@ class MultiLayerNetwork:
 
             if self.batch_norm is not None:
                 # Normalize (scale & shift) output to a better distribution
-                s_i = self.batch_norm.forward_per_layer(s_i, layer)
+                s_i = self.batch_norm.forward_per_layer(s_i, layer, testing=testing)
 
             # apply ReLU activation function
             h_i = self.relu(s_i)
@@ -497,7 +497,7 @@ class MultiLayerNetwork:
         init_b = copy.deepcopy(self.b)
 
         # Calculate numerically
-        grad_w_num, grad_b_num = self.compute_grads_num(data, labels)
+        grad_w_num, grad_b_num, grad_gamma_num, grad_beta_num = self.compute_grads_num(data, labels)
 
         # Reset weights and bias to start from the same position
         self.w = copy.deepcopy(init_w)
@@ -535,6 +535,9 @@ class MultiLayerNetwork:
 
         grad_w = []
         grad_b = []
+
+        grad_gamma = []
+        grad_beta = []
 
         for j in range(len(self.b)):
 
@@ -581,4 +584,52 @@ class MultiLayerNetwork:
 
             grad_w.append(grad_w_k)
 
-        return grad_w, grad_b
+            # last layer doesnt have gamma and beta
+            if self.batch_norm is not None and k != len(self.w) - 1:
+                grad_gamma_i, grad_beta_i = self.compute_batch_norm_grads_num(data, targets, k)
+                grad_gamma.append(grad_gamma_i)
+                grad_beta.append(grad_beta_i)
+
+        return grad_w, grad_b, grad_gamma, grad_beta
+
+    def compute_batch_norm_grads_num(self, data, targets, layer):
+
+        h = 1e-5
+
+        gamma_grad_i = np.zeros(self.batch_norm.gamma[layer].shape)
+
+        for i in range(len(self.batch_norm.gamma[layer])):
+            self.batch_norm.gamma[layer][i] = self.batch_norm.gamma[layer][i] - h
+
+            layers_out, _ = self.forward(data)
+            c1, _ = self.cross_entropy_loss(layers_out[-1], targets)
+            c1 += self.reg()
+
+            self.batch_norm.gamma[layer][i] = self.batch_norm.gamma[layer][i] + 2 * h
+
+            layers_out, _ = self.forward(data)
+            c2, _ = self.cross_entropy_loss(layers_out[-1], targets)
+            c2 += self.reg()
+
+            self.batch_norm.gamma[layer][i] = self.batch_norm.gamma[layer][i] - h
+            gamma_grad_i[i] = (c2 - c1) / (2 * h)
+
+        beta_grad_i = np.zeros(self.batch_norm.gamma[layer].shape)
+
+        for i in range(len(self.batch_norm.beta[layer])):
+            self.batch_norm.beta[layer][i] = self.batch_norm.beta[layer][i] - h
+
+            layers_out, _ = self.forward(data)
+            c1, _ = self.cross_entropy_loss(layers_out[-1], targets)
+            c1 += self.reg()
+
+            self.batch_norm.beta[layer][i] = self.batch_norm.beta[layer][i] + 2 * h
+
+            layers_out, _ = self.forward(data)
+            c2, _ = self.cross_entropy_loss(layers_out[-1], targets)
+            c2 += self.reg()
+
+            self.batch_norm.beta[layer][i] = self.batch_norm.beta[layer][i] - h
+            beta_grad_i[i] = (c2 - c1) / (2 * h)
+
+        return gamma_grad_i, beta_grad_i
