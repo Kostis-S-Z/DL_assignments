@@ -495,12 +495,11 @@ class MultiLayerNetwork:
 
         if use_batch_norm:
             self.batch_norm = BatchNormalization(network_structure, self.n_batch)
+            init_gamma = copy.deepcopy(self.batch_norm.gamma)
+            init_beta = copy.deepcopy(self.batch_norm.beta)
 
         init_w = copy.deepcopy(self.w)
         init_b = copy.deepcopy(self.b)
-
-        init_gamma = copy.deepcopy(self.batch_norm.gamma)
-        init_beta = copy.deepcopy(self.batch_norm.beta)
 
         # Calculate numerically
         grad_w_num, grad_b_num, grad_gamma_num, grad_beta_num = self.compute_grads_num(data, labels)
@@ -509,15 +508,17 @@ class MultiLayerNetwork:
         self.w = copy.deepcopy(init_w)
         self.b = copy.deepcopy(init_b)
 
-        self.batch_norm.gamma = copy.deepcopy(init_gamma)
-        self.batch_norm.beta = copy.deepcopy(init_beta)
+        if use_batch_norm:
+            self.batch_norm.gamma = copy.deepcopy(init_gamma)
+            self.batch_norm.beta = copy.deepcopy(init_beta)
 
         # Calculate analytically
         l_out, _ = self.forward(data)
         _, _,  grad_w_ana, grad_b_ana = self.backward(l_out, data, labels)
 
-        grad_gamma_ana = self.batch_norm.gamma_grads
-        grad_beta_ana = self.batch_norm.beta_grads
+        if use_batch_norm:
+            grad_gamma_ana = self.batch_norm.gamma_grads
+            grad_beta_ana = self.batch_norm.beta_grads
 
         for i in range(len(grad_w_ana) - 1):
             layer = np.random.randint(0, len(grad_w_ana) - 1)

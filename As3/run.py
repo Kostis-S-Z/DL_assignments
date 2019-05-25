@@ -4,6 +4,8 @@ Created by Kostis S-Z @ 2019-03-27
 
 
 import numpy as np
+import os
+import datetime
 from pathlib import Path
 from network3 import MultiLayerNetwork
 from data import load_data, preprocess_data, process_zero_mean
@@ -13,28 +15,37 @@ directory = parent_dir + "/cifar-10-batches-py"  # The dataset should be in the 
 
 
 model_parameters = {
+    # Basic variables
     "eta_min": 1e-5,  # min learning rate for cycle
     "eta_max": 1e-1,  # max learning rate for cycle
     "n_s": 500,  # parameter variable for cyclical learning rate
     "n_batch": 100,  # size of data batches within an epoch
     "init_type": "Xavier",  # Choose between Xavier and He initialisation
-    "dropout": False,  # Use dropout or not
-    "dropout_perc": 0.2,  # Percentage of nodes to dropout
+    "lambda_reg": 0.005,  # regularizing term variable
+    # Extra variables
     "train_noisy": False,  # variable to toggle adding noise to the training data
     "noise_m": 0,  # the mean of the gaussian noise added to the training data
     "noise_std": 0.01,  # the standard deviation of the gaussian noise added to the training data
-    "lambda_reg": 0.005,  # regularizing term variable
+    "dropout": False,  # Use dropout or not
+    "dropout_perc": 0.2,  # Percentage of nodes to dropout
     "min_delta": 0.01,  # minimum accepted validation error
     "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
-# index_of_layer : number_of_nodes
+# Train a network values
+epochs = 5
+model_parameters["n_s"] = 800  # (5 * 45000) / model_parameters["n_batch"]
+use_batch_norm = True
+early_stop = False
+ensemble = False
 
+# index_of_layer : number_of_nodes
 layer2 = {0: 50, 1: 10}
 layer3 = {0: 50, 1: 50, 2: 10}
+layer4 = {0: 50, 1: 50, 2: 10, 3: 10}
 layer9 = {0: 50, 1: 30, 2: 20, 3: 20, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10}
 
-network_structure = layer9
+network_structure = layer4
 
 
 def main():
@@ -53,12 +64,12 @@ def main():
     test_x = process_zero_mean(test_x, mean, std)
 
     # Testing gradients
-    # test_grad_computations(train_x, train_y)
+    test_grad_computations(train_x, train_y)
 
     # Training simple k-layer networks
     # train_simple(train_x, train_y, val_x, val_y, test_x, test_y)
 
-    train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
+    # train_a_network(train_x, train_y, val_x, val_y, test_x, test_y)
 
 
 def test_grad_computations(train_x, train_y):
@@ -87,7 +98,6 @@ def train_simple(train_x, train_y, val_x, val_y, test_x, test_y):
     n_s = 2 * int(train_x.shape[0] / model_parameters["n_batch"])
     model_parameters["n_s"] = n_s
     model_parameters["lambda_reg"] = 0.00087
-    layer2 = {0: 50, 1: 10}
 
     pa = 5
     cycles = 2
@@ -114,23 +124,42 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     Train and test a two-layer network
     """
     net = MultiLayerNetwork(**model_parameters)
-    epochs = 50
-
-    model_parameters["n_s"] = 800  # (5 * 45000) / model_parameters["n_batch"]
-
-    # train_x = train_x[:10, :3]
 
     net.train(network_structure, train_x, train_y, n_epochs=epochs,
-              use_batch_norm=True, early_stop=False, ensemble=False, verbose=True)
+              use_batch_norm=use_batch_norm, early_stop=early_stop, ensemble=ensemble, verbose=True)
     # net.train(network_structure, train_x, train_y, val_data=val_x, val_labels=val_y, n_epochs=epochs,
     #           use_batch_norm=True, early_stop=False, ensemble=False, verbose=True)
 
-    net.plot_train_val_progress()
-    net.plot_eta_history()
+    # net.plot_train_val_progress()
+    # net.plot_eta_history()
 
     test_loss, test_cost, test_accuracy = net.test(test_x, test_y)
 
     print("Test accuracy: ", test_accuracy)
+
+    save_model(test_accuracy)
+
+
+def save_model(accuracy):
+    now = datetime.datetime.now()
+    model_id = str(now.day) + "_" + str(now.month) + "_" + str(now.hour) + "." + str(now.minute)
+
+    os.makedirs(model_id)
+    with open(model_id + '/model_params.txt', 'w') as f:
+        f.write("Results: \n")
+        f.write("  Accuracy: " + str(100 * accuracy) + "%\n\n")
+
+        f.write("Model parameters: \n")
+        f.write("  Epochs : " + str(epochs) + "\n")
+        f.write("  Batch Normalization : " + str(use_batch_norm) + "\n")
+        f.write("  Early Stopping : " + str(early_stop) + "\n")
+        f.write("  Ensemble : " + str(ensemble) + "\n")
+
+        for key, value in model_parameters.items():
+            f.write("  " + key + " : " + str(value) + "\n")
+        f.write("\nNetwork architecture: \n")
+        for key, value in network_structure.items():
+            f.write("  " + str(key) + " : " + str(value) + "\n")
 
 
 if __name__ == "__main__":
