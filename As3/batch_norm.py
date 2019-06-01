@@ -131,6 +131,9 @@ class BatchNormalization:
         return loss_i_grad
 
     def bn_backpass(self, g_batch, i):
+        """
+        Back pass
+        """
         ones = np.ones((self.n_batch, 1))
 
         sigma_1 = (self.layer_vars[i] + e) ** (-0.5)
