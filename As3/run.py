@@ -45,7 +45,7 @@ layer3 = {0: 50, 1: 50, 2: 10}
 layer4 = {0: 50, 1: 50, 2: 10, 3: 10}
 layer9 = {0: 50, 1: 30, 2: 20, 3: 20, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10}
 
-network_structure = layer4
+network_structure = layer9
 
 
 def main():

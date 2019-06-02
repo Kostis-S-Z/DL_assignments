@@ -21,7 +21,7 @@ class BatchNormalization:
     var_av:
     """
     # TODO: what learning rate?
-    def __init__(self, net_structure, batch_size, alpha=0.5, learning_rate=0.1):
+    def __init__(self, net_structure, batch_size, alpha=0.5, learning_rate=1.):
 
         self.n_batch = batch_size
         self.alpha = alpha  # smaller than 0.9
@@ -56,8 +56,8 @@ class BatchNormalization:
             ones = np.ones((net_structure[l], 1))
             random = np.random.normal(mean, std, (net_structure[l], 1))
             # Initialize beta & gamma
-            self.gamma.append(random)
-            self.beta.append(random)
+            self.gamma.append(ones)
+            self.beta.append(zeros)
             # Initialize moving average of mean and variance
             self.m_av.append(0)
             self.var_av.append(0)
@@ -75,15 +75,17 @@ class BatchNormalization:
         """
         self.l_out_unnorm.append(s_i)  # s_i: m (number of nodes) X batch size
 
+        n = s_i.shape[1]  # N batch size
+
         if testing:
             # This is used for testing
             mean_i = self.m_av[layer]
             var_i = self.var_av[layer]
         else:
             # Calculate mean and variance over the un-normalized samples (the batch size)
-            mean_i = np.mean(s_i, axis=1)
+            mean_i = np.mean(s_i, axis=1)  # maybe keepdims=True
             # both ways give the same result
-            var_i = np.var(s_i, axis=1)  # maybe compensate with * (n-1) / n)
+            var_i = np.var(s_i, axis=1) * ((n-1) / n)  # maybe compensate with * (n-1) / n)
             # var_i = np.sum(((s_i.T - mean_i) ** 2 / self.n_batch), axis=0)
 
         # Scale and shift to a normalized activation
