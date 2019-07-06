@@ -20,6 +20,7 @@ class MultiLayerNetwork:
         var_defaults = {
             "eta_min": 1e-5,  # min learning rate for cycle
             "eta_max": 1e-1,  # max learning rate for cycle
+            "bn_cyc_eta": True,  # Use cyclical learning rate for BN
             "n_s": 500,  # parameter variable for cyclical learning rate
             "n_batch": 100,  # size of data batches within an epoch
             "lambda_reg": .1,  # regularizing term variable
@@ -154,7 +155,7 @@ class MultiLayerNetwork:
             self.acc_train_av_history.append(average_epoch_acc)
 
             if verbose:
-                print("Epoch: {} - Accuracy: {} Loss: {}".format(i, average_epoch_acc, average_epoch_loss))
+                print("Epoch: {}/{} - Accuracy: {:.2f} Loss: {:.2f}".format(i, n_epochs, average_epoch_acc * 100, average_epoch_loss))
 
             if not ensemble:
                 self.models[0] = [self.w, self.b]  # if ensemble was disabled, just save the last model
@@ -295,7 +296,10 @@ class MultiLayerNetwork:
         for layer_i in range(len(l_out)-2, 0, -1):
 
             if self.batch_norm is not None:
-                loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad, layer_i)
+                if self.bn_cyc_eta:
+                    loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad, layer_i, eta_cyc=self.eta)
+                else:
+                    loss_i_grad = self.batch_norm.backward_per_layer(loss_i_grad, layer_i)
 
             # Calculate layer weight gradient based on the loss of that layer and the input of that layer
             w_i_grad = np.dot(loss_i_grad, l_out[layer_i-1].T) / self.n_batch
@@ -520,15 +524,17 @@ class MultiLayerNetwork:
             grad_gamma_ana = self.batch_norm.gamma_grads
             grad_beta_ana = self.batch_norm.beta_grads
 
-        for i in range(len(grad_w_ana) - 1):
-            layer = np.random.randint(0, len(grad_w_ana) - 1)
-            node = np.random.randint(0, len(grad_w_ana[layer]))
+        for i in range(len(grad_w_num) - 1):
+            layer = i  # np.random.randint(0, len(grad_w_num) - 1)
+            node = np.random.randint(0, len(grad_w_num[layer]))
             print("Random samples of hidden layer {} of neuron {}".format(layer, node))
-            print(grad_w_num[layer][node][0:5])
-            print(grad_w_ana[layer][node][0:5])
+            print(grad_w_num[layer][node])
+            print(grad_w_ana[layer][node])
 
-            # print(grad_gamma_num[layer][node])
-            # print(grad_gamma_ana[layer][node])
+            if use_batch_norm:
+                print("Random GAMMAs of hidden layer {} of neuron {}".format(layer, node))
+                print(grad_gamma_num[layer][node])
+                print(grad_gamma_ana[layer][node])
 
         print("Random samples of output layer of neuron 1")
         print(grad_w_num[-1][0][:5])
@@ -539,8 +545,8 @@ class MultiLayerNetwork:
             print("Hidden layer {} weights: {}".format(i, np.mean(np.abs(grad_w_ana[i]) - np.abs(grad_w_num[i]))))
             print("Hidden bias {} weights: {}".format(i, np.mean(np.abs(grad_b_ana[i]) - np.abs(grad_b_num[i]))))
 
-        # print("Output layer weights:", np.mean(np.abs(grad_w_ana[-1]) - np.abs(grad_w_num[-1])))
-        # print("Output layer bias:", np.mean(np.abs(grad_b_ana[-1]) - np.abs(grad_b_num[-1])))
+        print("Output layer weights:", np.mean(np.abs(grad_w_ana[-1]) - np.abs(grad_w_num[-1])))
+        print("Output layer bias:", np.mean(np.abs(grad_b_ana[-1]) - np.abs(grad_b_num[-1])))
 
     def compute_grads_num(self, data, targets):
         """
