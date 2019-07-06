@@ -20,11 +20,10 @@ class BatchNormalization:
     m_av:
     var_av:
     """
-    # TODO: what learning rate?
-    def __init__(self, net_structure, batch_size, alpha=0.5, learning_rate=1.):
+    def __init__(self, net_structure, batch_size, alpha=0.9, learning_rate=0.001):
 
         self.n_batch = batch_size
-        self.alpha = alpha  # smaller than 0.9
+        self.alpha = alpha
         self.eta_bn = learning_rate
 
         self.gamma = []
@@ -83,14 +82,13 @@ class BatchNormalization:
             var_i = self.var_av[layer]
         else:
             # Calculate mean and variance over the un-normalized samples (the batch size)
-            mean_i = np.mean(s_i, axis=1)  # maybe keepdims=True
+            mean_i = np.mean(s_i, axis=1, keepdims=True)
             # both ways give the same result
-            var_i = np.var(s_i, axis=1) * ((n-1) / n)  # maybe compensate with * (n-1) / n)
+            var_i = np.var(s_i, axis=1, keepdims=True) * ((n-1) / n)  # maybe compensate with * (n-1) / n)
             # var_i = np.sum(((s_i.T - mean_i) ** 2 / self.n_batch), axis=0)
 
         # Scale and shift to a normalized activation
-        s_i_norm = (s_i.T - mean_i) / ((var_i + e) ** (-0.5))
-        s_i_norm = s_i_norm.T
+        s_i_norm = (s_i - mean_i) / np.sqrt(var_i + e)
 
         # Update s
         s_i = self.gamma[layer] * s_i_norm + self.beta[layer]
@@ -103,7 +101,7 @@ class BatchNormalization:
 
         return s_i
 
-    def backward_per_layer(self, loss_i_grad, layer_i):
+    def backward_per_layer(self, loss_i_grad, layer_i, eta_cyc=None):
         """
         A backward pass with Batch Normalization
         :return normalized loss gradient
@@ -124,8 +122,9 @@ class BatchNormalization:
         # If you are in the first layer, update all gamma and beta from the gradients
         if layer_i == 0:
             # Update backwards
+            if eta_cyc is not None:
+                self.eta_bn = eta_cyc
             for i in range(len(self.gamma) - 1, -1, -1):
-                # TODO: how do you update gamma and beta exactly? do you use a learning rate?
                 self.gamma[i] = self.gamma[i] - (self.eta_bn * self.gamma_grads[i])
                 self.beta[i] = self.beta[i] - (self.eta_bn * self.beta_grads[i])
                 self.update_moving_av(i)
@@ -164,5 +163,5 @@ class BatchNormalization:
         return new_g_batch
 
     def update_moving_av(self, i):
-        self.m_av[i] = self.alpha * self.m_av[i] + (1 - self.alpha) * self.layer_means[i]
-        self.var_av[i] = self.alpha * self.var_av[i] + (1 - self.alpha) * self.layer_vars[i]
+        self.m_av[i] = self.alpha * self.m_av[i] + ((1 - self.alpha) * self.layer_means[i])
+        self.var_av[i] = self.alpha * self.var_av[i] + ((1 - self.alpha) * self.layer_vars[i])
