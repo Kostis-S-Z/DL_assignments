@@ -36,28 +36,65 @@ model_parameters = {
     "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
+"""
+TODO 1
+use_batch_norm = True
+network_structure = layer3
+
+TODO 2
+use_batch_norm = True
+network_structure = layer9
+
+TODO 3
+test_lambda = True
+fine = False
+use_batch_norm = True
+network_structure = layer3
+
+TODO 4
+test_lambda = True
+fine = True
+use_batch_norm = True
+network_structure = layer3
+
+TODO 5
+use_batch_norm = True
+network_structure = layer3
+model_parameters["init_type"] = 1e-1
+
+TODO 6
+use_batch_norm = True
+network_structure = layer3
+model_parameters["init_type"] = 1e-3
+
+TODO 7
+use_batch_norm = True
+network_structure = layer3
+model_parameters["init_type"] = 1e-4
+"""
 
 # Train a network values
 n_cycles = 2
-model_parameters["n_s"] = (5 * 45000) / model_parameters["n_batch"]
-epochs = int(2 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
+# model_parameters["n_s"] = (5 * 45000) / model_parameters["n_batch"]
+# epochs = int(0.5 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
+# epochs = int(2 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
 
 save = True
+now = datetime.datetime.now()
+model_id = str(now.day) + "_" + str(now.month) + "_" + str(now.hour) + "." + str(now.minute) + "/"
+# model_id = "l3_bn_sig1e4/"
 
-# TODO: Batch Norm
-
-
-# TODO: Lambda search
+# Lambda search
 test_lambda = False
 fine = True
 # network_structure = layer3
 
 
-# TODO: Sensitivity to initiliasation
-# model_parameters["init_type"] = "He"
-# net_sig = 1e-1  # 1e-3  1e-4
+# Sensitivity to initialisation
+# model_parameters["init_type"] = 1e-4  # 1e-3  1e-4
 # model_parameters["n_s"] = (2 * 45000) / model_parameters["n_batch"]
 # epochs = int(2 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
+epochs = 8
 
 use_batch_norm = False
 early_stop = False
@@ -74,7 +111,7 @@ network_structure = layer3
 
 def main():
     # Use the loading function from Assignment 1
-    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=True, val_size=10000)
+    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=True, val_size=5000)
 
     # Use the preprocessing function from Assignment 1
     train_x, train_y = preprocess_data(train_x, train_y)
@@ -160,11 +197,12 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
     test_loss, test_cost, test_accuracy = net.test(test_x, test_y)
 
     if save:
-        model_id = save_model(test_accuracy)
+        save_model(test_accuracy)
+        model_dir = model_id
     else:
-        model_id = None
+        model_dir = None
 
-    net.plot_train_val_progress(save_dir=model_id)
+    net.plot_train_val_progress(save_dir=model_dir)
     net.plot_eta_history()
 
     print("Test accuracy: ", test_accuracy * 100)
@@ -173,8 +211,6 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
 
 
 def save_model(accuracy):
-    now = datetime.datetime.now()
-    model_id = str(now.day) + "_" + str(now.month) + "_" + str(now.hour) + "." + str(now.minute) + "/"
 
     os.makedirs(model_id)
     with open(model_id + 'model_params.txt', 'w') as f:
@@ -192,8 +228,6 @@ def save_model(accuracy):
         f.write("\nNetwork architecture: \n")
         for key, value in network_structure.items():
             f.write("  " + str(key) + " : " + str(value) + "\n")
-
-    return model_id
 
 
 def lambda_search(train_x, train_y, val_x, val_y, test_x, test_y):

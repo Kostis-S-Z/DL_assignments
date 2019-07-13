@@ -4,7 +4,6 @@ Created by Kostis S-Z @ 2019-04-03
 
 import copy
 import numpy as np
-from scipy.stats import mode
 from matplotlib import pyplot as plt
 
 from batch_norm import BatchNormalization
@@ -59,14 +58,17 @@ class MultiLayerNetwork:
         mean = 0
         if self.init_type == "Xavier":
             numer = 1
-        else:  # use He initialisation
+        elif self.init_type == "He":  # use He initialisation
             numer = 2
+        else:
+            std = self.init_type
 
         dim_prev_layer = d
         # For every layer (including the output)
         for l in range(len(net_structure)):
             # Calculate standard deviation to initialise the weights of layer i
-            std = numer / np.sqrt(dim_prev_layer)
+            if self.init_type == "Xavier" or self.init_type == "He":
+                std = numer / np.sqrt(dim_prev_layer)
             # Initialize weight matrix of layer i
             w_layer_i = np.random.normal(mean, std, (net_structure[l], dim_prev_layer))
             # Initialize bias column vector of layer i
@@ -431,9 +433,9 @@ class MultiLayerNetwork:
         plt.legend()
         plt.xlabel(xlabel)
         plt.ylabel(title)
-        plt.show()
         if save_dir is not None:
             plt.savefig(save_dir + title + "_plot.png")
+        plt.show()
 
     def plot_image(self, image, title=""):
         """
