@@ -154,9 +154,6 @@ class MultiLayerNetwork:
             self.cost_train_av_history.append(average_epoch_cost)
             self.acc_train_av_history.append(average_epoch_acc)
 
-            if verbose:
-                print("Epoch: {}/{} - Accuracy: {:.2f} Loss: {:.2f}".format(i, n_epochs, average_epoch_acc * 100, average_epoch_loss))
-
             if not ensemble:
                 self.models[0] = [self.w, self.b]  # if ensemble was disabled, just save the last model
 
@@ -172,6 +169,10 @@ class MultiLayerNetwork:
                     if self.early_stopping(val_error):
                         break
 
+            if verbose:
+                print("Epoch: {}/{} - Train Accuracy: {:.2f} | Loss: {:.2f} | Val Accuracy: {:.2f}".format(
+                    i, n_epochs, average_epoch_acc * 100, average_epoch_loss, val_acc * 100))
+
     def test(self, test_data, test_targets):
         """
         Test a trained model
@@ -179,60 +180,34 @@ class MultiLayerNetwork:
         n = test_data.shape[0]  # number of samples
         batch_epochs = int(n / self.n_batch)
 
-        models_out = {}
-        models_accuracy = {}
-        models_loss = {}
-        models_cost = {}
-
         test_labels = np.argmax(test_targets, axis=1)  # Convert one-hot to integer
 
-        # Train each model separately
-        for i, model in self.models.items():
+        # self.w = self.models[0][0]  # use the weights of model i
+        # self.b = self.models[0][1]  # use the bias of model i
 
-            self.w = model[0]  # use the weights of model i
-            self.b = model[1]  # use the bias of model i
+        model_out = np.zeros(test_labels.shape)
+        test_average_loss = 0
+        test_average_cost = 0
 
-            model_out = np.zeros(test_labels.shape)
+        for batch in range(batch_epochs):
+            start = batch * self.n_batch
+            end = start + self.n_batch
 
-            test_average_loss_i = 0  # Initialize average loss of model i
-            test_average_cost_i = 0  # Initialize average cost of model i
+            batch_data = test_data[start:end].T
+            batch_labels = test_targets[start:end].T
 
-            for batch in range(batch_epochs):
-                start = batch * self.n_batch
-                end = start + self.n_batch
+            layers_out, class_out = self.forward(batch_data, testing=True)
+            model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
 
-                batch_data = test_data[start:end].T
-                batch_labels = test_targets[start:end].T
+            loss, _ = self.cross_entropy_loss(layers_out[-1], batch_labels)
+            test_average_loss += loss
+            test_average_cost += loss + self.reg()
 
-                layers_out, class_out = self.forward(batch_data, testing=True)
-                model_out[start:end] = class_out  # Add the batch predictions to the overall predictions
+            model_loss = test_average_loss / batch_epochs
+            model_cost = test_average_cost / batch_epochs
+            model_accuracy = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
 
-                loss, _ = self.cross_entropy_loss(layers_out[-1], batch_labels)
-                test_average_loss_i += loss
-                test_average_cost_i += loss + self.reg()
-
-            models_loss[i] = test_average_loss_i / batch_epochs
-            models_cost[i] = test_average_cost_i / batch_epochs
-            models_accuracy[i] = self.accuracy(model_out, test_labels)  # Calculate the accuracy of each classifier
-            models_out[i] = model_out  # Save the output of the model
-
-        # Concatenate all results to a list
-        results = []
-        for i, model_results in models_out.items():
-            results.append(model_results)
-            # print("Model {} had {}% Test accuracy".format(i, models_accuracy[i] * 100))
-
-        # Take majority vote across models
-        average_out = mode(results, axis=0)[0]
-
-        # Average accuracy over all models
-        test_average_acc = self.accuracy(average_out, test_labels)
-        # Average loss over all models
-        test_average_loss = np.sum(list(models_loss.values())) / len(models_loss)
-        # Average cost over all models
-        test_average_cost = np.sum(list(models_cost.values())) / len(models_cost)
-
-        return test_average_loss, test_average_cost, test_average_acc
+        return model_loss, model_cost, model_accuracy
 
     def forward(self, data, testing=False):
         """
@@ -435,15 +410,15 @@ class MultiLayerNetwork:
         print(' Train Error: {}'.format(train_error))
         print(' Validation Error: {}'.format(val_error))
 
-    def plot_train_val_progress(self):
+    def plot_train_val_progress(self, save_dir=None):
         """
         Plot loss, cost, accuracy
         """
-        self.general_plot(self.loss_train_av_history, self.loss_val_av_history, title="Loss", xlabel="Update steps")
-        self.general_plot(self.cost_train_av_history, self.cost_val_av_history, title="Cost", xlabel="Update steps")
-        self.general_plot(self.acc_train_av_history, self.acc_val_av_history, title="Accuracy", xlabel="Update steps")
+        self.general_plot(save_dir, self.loss_train_av_history, self.loss_val_av_history, title="Loss", xlabel="Epochs")
+        self.general_plot(save_dir, self.cost_train_av_history, self.cost_val_av_history, title="Cost", xlabel="Epochs")
+        self.general_plot(save_dir, self.acc_train_av_history, self.acc_val_av_history, title="Accuracy", xlabel="Epochs")
 
-    def general_plot(self, var_train, var_val, title=None, xlabel=None):
+    def general_plot(self, save_dir, var_train, var_val, title=None, xlabel=None):
         """
         Plot the history of a variable
         """
@@ -457,6 +432,8 @@ class MultiLayerNetwork:
         plt.xlabel(xlabel)
         plt.ylabel(title)
         plt.show()
+        if save_dir is not None:
+            plt.savefig(save_dir + title + "_plot.png")
 
     def plot_image(self, image, title=""):
         """
