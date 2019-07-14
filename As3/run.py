@@ -81,8 +81,8 @@ n_cycles = 2
 
 save = True
 now = datetime.datetime.now()
-model_id = str(now.day) + "_" + str(now.month) + "_" + str(now.hour) + "." + str(now.minute) + "/"
-# model_id = "l3_bn_sig1e4/"
+# model_id = str(now.day) + "_" + str(now.month) + "_" + str(now.hour) + "." + str(now.minute) + "/"
+model_id = "l3_bn/"
 
 # Lambda search
 test_lambda = False
@@ -94,9 +94,9 @@ fine = True
 # model_parameters["init_type"] = 1e-4  # 1e-3  1e-4
 # model_parameters["n_s"] = (2 * 45000) / model_parameters["n_batch"]
 # epochs = int(2 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
-epochs = 8
+epochs = 12
 
-use_batch_norm = False
+use_batch_norm = True
 early_stop = False
 ensemble = False
 
