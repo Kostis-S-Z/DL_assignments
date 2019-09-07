@@ -36,53 +36,16 @@ model_parameters = {
     "patience": 40  # how many epochs to wait before stopping training if the val_error is below min_delta
 }
 
-"""
-TODO 1
-use_batch_norm = True
-network_structure = layer3
-
-TODO 2
-use_batch_norm = True
-network_structure = layer9
-
-TODO 3
-test_lambda = True
-fine = False
-use_batch_norm = True
-network_structure = layer3
-
-TODO 4
-test_lambda = True
-fine = True
-use_batch_norm = True
-network_structure = layer3
-
-TODO 5
-use_batch_norm = True
-network_structure = layer3
-model_parameters["init_type"] = 1e-1
-
-TODO 6
-use_batch_norm = True
-network_structure = layer3
-model_parameters["init_type"] = 1e-3
-
-TODO 7
-use_batch_norm = True
-network_structure = layer3
-model_parameters["init_type"] = 1e-4
-"""
-
 # Train a network values
 n_cycles = 2
-# model_parameters["n_s"] = (5 * 45000) / model_parameters["n_batch"]
+model_parameters["n_s"] = (5 * 45000) / model_parameters["n_batch"]
 # epochs = int(0.5 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
-# epochs = int(2 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
+epochs = int(2 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
 
 save = True
 now = datetime.datetime.now()
-# model_id = str(now.day) + "_" + str(now.month) + "_" + str(now.hour) + "." + str(now.minute) + "/"
-model_id = "l3_bn/"
+model_id = str(now.day) + "_" + str(now.month) + "_" + str(now.hour) + "." + str(now.minute) + "/"
+# model_id = "l3_nobn/"
 
 # Lambda search
 test_lambda = False
@@ -94,9 +57,8 @@ fine = True
 # model_parameters["init_type"] = 1e-4  # 1e-3  1e-4
 # model_parameters["n_s"] = (2 * 45000) / model_parameters["n_batch"]
 # epochs = int(2 * n_cycles * (model_parameters["n_s"] / model_parameters["n_batch"]))  # 48
-epochs = 12
 
-use_batch_norm = True
+use_batch_norm = False
 early_stop = False
 ensemble = False
 
@@ -111,7 +73,7 @@ network_structure = layer3
 
 def main():
     # Use the loading function from Assignment 1
-    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=True, val_size=5000)
+    train_x, train_y, val_x, val_y, test_x, test_y = load_data(use_all=False, val_size=5000)  # Use all or not?!
 
     # Use the preprocessing function from Assignment 1
     train_x, train_y = preprocess_data(train_x, train_y)
@@ -191,8 +153,6 @@ def train_a_network(train_x, train_y, val_x, val_y, test_x, test_y):
 
     net.train(network_structure, train_x, train_y, val_data=val_x, val_labels=val_y, n_epochs=epochs,
               use_batch_norm=use_batch_norm, early_stop=early_stop, ensemble=ensemble, verbose=True)
-    # net.train(network_structure, train_x, train_y, val_data=val_x, val_labels=val_y, n_epochs=epochs,
-    #           use_batch_norm=True, early_stop=False, ensemble=False, verbose=True)
 
     test_loss, test_cost, test_accuracy = net.test(test_x, test_y)
 
